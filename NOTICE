@@ -1,0 +1,7 @@
+grepui
+Copyright 2026 The grepui authors
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The UI and server are original code written for this project. No third-party observability
+UI source is vendored or copied; other products are referenced for interaction ideas only.

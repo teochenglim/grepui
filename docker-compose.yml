@@ -1,0 +1,22 @@
+# GreptimeDB + grepui. Seed demo data afterwards with: python3 scripts/seed.py
+services:
+  greptimedb:
+    image: greptime/greptimedb:v1.2.1
+    command: >
+      standalone start --http-addr 0.0.0.0:4000 --rpc-bind-addr 0.0.0.0:4001
+      --mysql-addr 0.0.0.0:4002 --postgres-addr 0.0.0.0:4003
+    ports: ["127.0.0.1:4000:4000"]
+    volumes: ["greptime-data:/greptimedb_data"]
+
+  grepui:
+    image: ${GREPUI_IMAGE:-ghcr.io/teochenglim/grepui:latest}
+    build: .
+    environment:
+      GREPTIME_MYSQL: mysql://root@greptimedb:4002/public
+      # The address collectors on the host use; shown on the Connect page.
+      GREPTIME_HTTP_PUBLIC: http://127.0.0.1:4000
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on: [greptimedb]
+
+volumes:
+  greptime-data:

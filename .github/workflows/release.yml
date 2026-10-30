@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Gate (make check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: tag must match VERSION
+        env:
+          TAG: ${{ github.ref_name }}
+        run: test "$TAG" = "v$(cat VERSION)"
+      - run: make check
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu }
+          - { os: macos-latest, target: aarch64-apple-darwin }
+          - { os: macos-15-intel, target: x86_64-apple-darwin }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Build
+        env:
+          GREPUI_VERSION: ${{ github.ref_name }}
+        run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Package
+        env:
+          VERSION: ${{ github.ref_name }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          NAME="grepui-${VERSION}-${TARGET}"
+          mkdir -p "dist/${NAME}"
+          cp "target/${TARGET}/release/grepui" LICENSE README.md "dist/${NAME}/" 2>/dev/null || cp "target/${TARGET}/release/grepui" "dist/${NAME}/"
+          tar -czf "${NAME}.tar.gz" -C dist "${NAME}"
+          shasum -a 256 "${NAME}.tar.gz" > "${NAME}.tar.gz.sha256"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: grepui-${{ matrix.target }}
+          path: |
+            grepui-*.tar.gz
+            grepui-*.sha256
+
+  publish:
+    name: GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          NOTES="RELEASE/${TAG}.md"
+          if [ -f "$NOTES" ]; then
+            gh release create "$TAG" artifacts/* --title "$TAG" --notes-file "$NOTES"
+          else
+            gh release create "$TAG" artifacts/* --title "$TAG" --generate-notes
+          fi

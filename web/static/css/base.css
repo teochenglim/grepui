@@ -1,0 +1,31 @@
+/* Design tokens, reset, typography. Light and dark follow the OS. */
+:root {
+  --bg: #0e1319; --surface: #151c24; --surface-2: #1b242e; --line: #26313d;
+  --text: #e6ebf0; --muted: #8b98a6; --accent: #14b8a6; --accent-ink: #062b27;
+  --ok: #3fb950; --warn: #d29922; --bad: #f85149; --info: #58a6ff;
+  --radius: 8px; --gap: 16px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f5f7f9; --surface: #ffffff; --surface-2: #eef2f5; --line: #d8e0e7;
+    --text: #17202a; --muted: #5d6b7a; --accent: #0d9488; --accent-ink: #ffffff;
+    --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; --info: #0969da;
+    color-scheme: light;
+  }
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #app { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 14px/1.5 var(--font); }
+h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+h1 { font-size: 20px; } h2 { font-size: 15px; } h3 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+p { margin: 0; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, pre, .mono { font-family: var(--mono); font-size: 12.5px; }
+pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.muted { color: var(--muted); }
+.boot { padding: 24px; color: var(--muted); }

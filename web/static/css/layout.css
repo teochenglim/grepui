@@ -1,0 +1,24 @@
+/* App shell: sidebar, top bar, content area. */
+.shell { display: grid; grid-template-columns: 220px 1fr; height: 100%; }
+.side { background: var(--surface); border-right: 1px solid var(--line); padding: 14px 10px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 14px; font-weight: 700; font-size: 17px; }
+.brand .logo { width: 26px; height: 26px; border-radius: 7px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-size: 15px; }
+.side h3 { padding: 14px 10px 4px; }
+.nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; border-radius: 6px; color: var(--text); }
+.nav:hover { background: var(--surface-2); text-decoration: none; }
+.nav.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 600; }
+.nav.soon { color: var(--muted); cursor: default; }
+.nav.soon:hover { background: none; }
+.main { display: flex; flex-direction: column; min-width: 0; height: 100%; }
+.top { display: flex; align-items: center; gap: 12px; padding: 10px 20px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.top .spacer { flex: 1; }
+.view { flex: 1; overflow: auto; padding: 20px; display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
+.page-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.page-head .sub { color: var(--muted); }
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.grid { display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+@media (max-width: 760px) {
+  .shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .side { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); }
+  .side h3 { display: none; }
+}

@@ -1,0 +1,34 @@
+[package]
+name = "grepui"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+repository = "https://github.com/teochenglim/grepui"
+description = "Multi-tenant observability UI for GreptimeDB, in one Rust binary"
+
+[dependencies]
+anyhow = "1.0.104"
+async-trait = "0.1.92"
+axum = "0.8"
+chrono = "0.4.45"
+clap = { version = "4", features = ["derive", "env"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "mysql", "chrono", "bigdecimal", "json"] }
+thiserror = "2.0.21"
+tokio = { version = "1.53.2", features = ["full"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+url = "2.5.8"
+
+[dev-dependencies]
+http-body-util = "0.1.5"
+tower = "0.5.3"
+
+[profile.release]
+lto = "thin"
+strip = true
+codegen-units = 1
+
+[profile.dev]
+debug = "line-tables-only"

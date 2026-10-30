@@ -1,0 +1,6 @@
+flowchart LR
+  B[Browser<br/>static HTML + ES modules] -->|/api/v1/orgs/org/...| G[grepui replicas<br/>Rust, axum]
+  G -->|MySQL protocol<br/>bound parameters| D[(GreptimeDB<br/>telemetry + grepui_* state)]
+  G -.->|federation| D2[(other GreptimeDB sources)]
+  C[Collectors / SDKs<br/>OTLP, Prometheus] -->|writes bypass grepui| D
+  G -->|webhook / SMTP| N[Alert destinations]

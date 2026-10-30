@@ -1,0 +1,5 @@
+target/
+bin/
+.DS_Store
+greptimedb_data/
+.playwright-mcp/
