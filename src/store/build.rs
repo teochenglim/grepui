@@ -6,8 +6,12 @@ use crate::query::{Bind, Q, qualified, ts_string};
 use anyhow::{Result, bail};
 
 /// An org name must look like one before it is ever bound (defence in depth).
+/// Platform-wide rows (users, org definitions, sessions) live under this pseudo org. A route can
+/// never name it: `org::valid_name` requires a letter or digit first.
+pub const PLATFORM_ORG: &str = "_platform";
+
 fn org(o: &str) -> Result<Bind> {
-    if !crate::org::valid_name(o) {
+    if !crate::org::valid_name(o) && o != PLATFORM_ORG {
         bail!("invalid org name");
     }
     Ok(Bind::Str(o.to_string()))
@@ -426,6 +430,14 @@ pub const ITEM_KINDS: &[&str] = &[
     // v0.10.0: small per-org settings share the table.
     "function",
     "redaction",
+    // v0.11.0: access control. `user`, `orgdef`, `session` and `oidc` are platform rows;
+    // `token` rows belong to their org.
+    "user",
+    "orgdef",
+    "session",
+    "oidc",
+    "token",
+    "setup",
 ];
 
 fn item_kind(kind: &str) -> Result<Bind> {
@@ -545,6 +557,92 @@ pub fn alert_history_list(
         "alert_history_list",
         format!(
             "SELECT `alert_id`, `state`, `outcome`, `detail`, CAST(`ts` AS BIGINT) AS at_ms FROM {t} WHERE {wh} ORDER BY `ts` DESC LIMIT {}",
+            limit.clamp(1, 500)
+        ),
+        binds,
+    ))
+}
+
+// ---- audit (R-C5) ----------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct AuditRow {
+    pub id: String,
+    pub username: String,
+    pub action: String,
+    pub target: String,
+    pub from_ms: i64,
+    pub to_ms: i64,
+    pub rows: i64,
+    pub status: i64,
+    pub outcome: String,
+    pub detail: String,
+    pub ts_ms: i64,
+}
+
+/// Append rows to the audit table. There is no builder that updates or deletes one.
+pub fn audit_put(meta_db: &str, org_name: &str, rows: &[AuditRow]) -> Result<Q> {
+    let t = qualified(meta_db, "grepui_audit")?;
+    if rows.is_empty() || rows.len() > 200 {
+        bail!("an audit batch holds 1-200 rows");
+    }
+    let tuple = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    let mut binds = vec![];
+    for r in rows {
+        binds.extend([
+            org(org_name)?,
+            Bind::Str(r.id.clone()),
+            Bind::Str(r.username.clone()),
+            Bind::Str(r.action.clone()),
+            Bind::Str(r.target.clone()),
+            Bind::Int(r.from_ms),
+            Bind::Int(r.to_ms),
+            Bind::Int(r.rows),
+            Bind::Int(r.status),
+            Bind::Str(r.outcome.clone()),
+            Bind::Str(r.detail.clone()),
+            Bind::Str(ts_string(r.ts_ms)),
+        ]);
+    }
+    Ok(Q::new(
+        "audit_put",
+        format!(
+            "INSERT INTO {t} (`org_id`, `id`, `username`, `action`, `target`, `from_ms`, `to_ms`, `rows`, `status`, `outcome`, `detail`, `ts`) VALUES {}",
+            vec![tuple; rows.len()].join(", ")
+        ),
+        binds,
+    ))
+}
+
+/// Newest first, in a time window, optionally for one user or action.
+pub fn audit_search(
+    meta_db: &str,
+    org_name: &str,
+    user: Option<&str>,
+    action: Option<&str>,
+    from_ms: i64,
+    to_ms: i64,
+    limit: u32,
+) -> Result<Q> {
+    let t = qualified(meta_db, "grepui_audit")?;
+    let mut binds = vec![
+        org(org_name)?,
+        Bind::Str(ts_string(from_ms)),
+        Bind::Str(ts_string(to_ms)),
+    ];
+    let mut wh = "`org_id` = ? AND `ts` >= ? AND `ts` < ?".to_string();
+    if let Some(u) = user {
+        wh.push_str(" AND `username` = ?");
+        binds.push(Bind::Str(u.to_string()));
+    }
+    if let Some(a) = action {
+        wh.push_str(" AND `action` = ?");
+        binds.push(Bind::Str(a.to_string()));
+    }
+    Ok(Q::new(
+        "audit_search",
+        format!(
+            "SELECT `id`, `username`, `action`, `target`, `from_ms`, `to_ms`, `rows`, `status`, `outcome`, `detail`, CAST(`ts` AS BIGINT) AS at_ms FROM {t} WHERE {wh} ORDER BY `ts` DESC LIMIT {}",
             limit.clamp(1, 500)
         ),
         binds,

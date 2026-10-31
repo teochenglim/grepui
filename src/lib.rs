@@ -4,6 +4,8 @@
 pub mod admin;
 pub mod alerts;
 pub mod api;
+pub mod audit;
+pub mod auth;
 pub mod config;
 pub mod csv;
 pub mod dash;

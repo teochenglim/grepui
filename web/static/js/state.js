@@ -10,6 +10,17 @@ export const RANGES = {
 
 export const state = { org: 'default', range: '1h' };
 
+/** Who is signed in and which orgs they may see (filled at start-up by main.js). */
+export const session = { me: null, orgs: [] };
+
+/** The caller's role in an org: admin, editor, viewer or null. */
+export function roleIn(org) {
+  const me = session.me;
+  if (!me) return null;
+  if (me.platform_admin || me.no_auth) return 'admin';
+  return me.orgs[org] || null;
+}
+
 /** The window every data call uses, resolved at call time so "last hour" stays current. */
 export function timeWindow() {
   const to = Date.now();

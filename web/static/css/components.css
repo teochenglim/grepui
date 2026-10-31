@@ -161,3 +161,9 @@ body.tv .side, body.tv .top { display: none; } body.tv .shell { grid-template-co
 .field { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); } .field input, .field select, .field textarea { font-size: 13px; }
 a.btn { display: inline-block; padding: 6px 12px; border-radius: var(--radius); text-decoration: none; }
 .timeline { margin: 4px 0 0; padding-left: 20px; color: var(--muted); font-size: 12.5px; }
+
+/* Access control (v0.11.0) */
+.login { min-height: 100vh; display: grid; place-items: center; padding: 16px; } .login form { width: min(380px, 100%); }
+.login input { width: 100%; }
+.logo-img { width: 22px; height: 22px; border-radius: 5px; object-fit: contain; }
+.who { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; }

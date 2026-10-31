@@ -2,7 +2,7 @@
 
 The single place to see where grepui stands: what is shipped, what is planned, what each release proves, and how a release is cut. Per-release detail (scope, acceptance criteria, named tests, checklist) lives in [`RELEASE/vX.Y.Z.md`](RELEASE/README.md); this file is the readable roll-up and the changelog.
 
-> **Current state:** v0.1.0 to v0.10.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.11.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
+> **Current state:** v0.1.0 to v0.11.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.12.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
 
 ## 1. Summary
 
@@ -21,14 +21,14 @@ grepui is a multi-tenant observability UI for GreptimeDB: one Rust binary (axum)
 
 ## 2. Release status
 
-Latest built: **v0.10.0: Pipelines, functions, enrichment, redaction** (ready). Newest first.
+Latest built: **v0.11.0: Access control, multi-tenancy, SSO and audit** (ready). Newest first.
 
 | Release | Theme | Status | ACs | Requirements covered |
 |---|---|---|---|---|
 | [v1.0.0](RELEASE/v1.0.0.md) | Launch hardening | planned | 2 | R-C2 R-F4 R-Q1 |
 | [v0.13.0](RELEASE/v0.13.0.md) | Reports, RUM view and operate | planned | 5 | R-E1 R-O1 R-O2 R-O3 R-U1 |
 | [v0.12.0](RELEASE/v0.12.0.md) | Query management, work groups and federation | planned | 5 | R-W1 R-W2 R-W3 R-Y1 R-Y2 |
-| [v0.11.0](RELEASE/v0.11.0.md) | Access control, multi-tenancy, SSO and audit | planned | 7 | R-C1 R-C2 R-C3 R-C4 R-C5 R-C6 |
+| [v0.11.0](RELEASE/v0.11.0.md) | Access control, multi-tenancy, SSO and audit | ready | 7 | R-C1 R-C2 R-C3 R-C4 R-C5 R-C6 |
 | [v0.10.0](RELEASE/v0.10.0.md) | Pipelines, functions, enrichment, redaction | ready | 4 | R-F4 R-N1 R-N2 R-N3 R-N4 |
 | [v0.9.0](RELEASE/v0.9.0.md) | Alerts and incidents | ready | 8 | R-A1 R-A2 R-A3 R-A4 R-A5 R-A6 R-A7 R-A8 |
 | [v0.8.0](RELEASE/v0.8.0.md) | Dashboards | ready | 6 | R-B1 R-B2 R-B3 R-B4 R-B5 R-B6 |
@@ -60,6 +60,12 @@ Newest first. An entry is written when a release becomes `ready`; the same text 
 ### Unreleased
 
 - Requirements, architecture, positioning and parity matrix (ARCH 00–07), release plan with ACs for v0.1.0–v1.0.0, `scripts/seed.py` (demo traces and logs over OTLP/protobuf, `--db` per org).
+
+### v0.11.0: Access control, multi-tenancy, SSO and audit (ready)
+
+Added: sign-in (first-run setup, argon2id passwords, hashed session cookies with expiry), roles per org (viewer, editor, admin) and platform admins, deny by default through one route table proven against every route; API tokens (shown once, hashed, scoped, revocable, rate-limited); OpenID Connect with PKCE and ID-token verification, claim-to-role mapping and a TLS client; orgs in the state store that platform admins create and delete (cascade over state rows, telemetry untouched); org administration (members, tokens, branding, audit search) and platform administration; an append-only audit trail of every data read, mutation and sign-in. `--no-auth` keeps the old open mode on loopback only. The playground signs in as `admin` / `grepui-demo-admin` (ADR 0012).
+
+State schema is now version 5: run `grepui migrate`. New flags `--no-auth`, `--session-hours`, `--token-rate-per-min`, `--oidc-*`; new dependencies argon2, ring, rustls, tokio-rustls, webpki-roots, base64 (`deny.toml` allows the CDLA-Permissive-2.0 licence of the root-certificate data). Limits: no stream or folder permissions and no quotas yet; older features still record `local` as owner; OIDC endpoints are flags (no discovery); verified against a local stand-in provider, not a real one.
 
 ### v0.10.0: Pipelines, functions, enrichment, redaction (ready)
 
@@ -175,6 +181,7 @@ Honest ledger of what has actually been run. Updated as releases land.
 | OpenInference spans on trace v2 (JSON2) | spike on v1.3.0: stored with 19 fixed columns (300 indexed messages and a 200 KB prompt in one span), queried with `json_get_*(col, '["key"]')`; grepui's trace list/waterfall/logs work on a v2 table, its span panel and attribute filters do not yet (roadmap LLM track L1) |
 | CI-parity run (fresh `make db-down db-up`, seed, `make test-db`) | green for every live test after the v0.4.0 fixes; it reproduced the v0.3.0 CI failure and found the join bug below |
 | **GreptimeDB v1.2.1: `IN (subquery)`, `EXISTS` and self-joins on a telemetry table return wrong, nondeterministic rows** | verified live (4 / 6 / 5 / 0 for a true 33); no such query is used (ADR 0007); the v0.5.0 dependency self-join is verified correct on v1.3.0 (`ac_0_5_3_dependencies_live`) |
+| Access control (v0.11.0): sessions, deny by default over every route, isolation matrix across two orgs, tokens, audit, org create/delete cascade | verified live (first admin once, cross-org blocking, a real `CREATE DATABASE`, the cascade, audit search) and in a browser (sign-in, administration, tokens, audit, platform orgs); OIDC verified against a local stand-in provider with generated keys, not a real one; the TLS client verified against example.com and a wrong-host certificate; the SSO redirect in a browser not exercised |
 | Pipelines, functions, enrichment, redaction (v0.10.0) | pipeline create/version/dry-run/delete verified live against GreptimeDB v1.3.0 (`ac_0_10_1_pipeline_live`); enrichment upload and the join helper verified live with exact per-tier counts (`ac_0_10_3_enrichment_join_live`); bound function arguments verified live; redaction verified on a live response; pipelines also tested against a local stand-in for the HTTP API; the role model is a stand-in (admin = `--admin-writes`) |
 | Alerts: rule evaluation, dedup, cooldown, downtimes, incidents, history, lease between two replicas, webhook delivery, SMTP (v0.9.0) | verified live (exact counts per service and builder count against the generator, lease handover on v1.3.0, the demo rule fires, dedups and opens an incident) and in a browser; webhook and SMTP are tested against local fake servers only, never a real mail relay or an https endpoint; the lease is not compare-and-set |
 | Dashboards: save, reload, variables bound as parameters, panel shapes, compare, public links, cascade delete, import and export (v0.8.0) | verified live (exact panel numbers against the generator, hostile variable values as plain values, real state store) and in a browser; the HTML sanitiser is hand written and covered by an attack-string test |

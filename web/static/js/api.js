@@ -21,6 +21,8 @@ async function request(url, opts = {}) {
     throw new Error('Cannot reach grepui. Is the server running?');
   }
   const text = await res.text();
+  // A lapsed or missing sign-in sends the app back to the sign-in page (not for the sign-in call itself).
+  if (res.status === 401 && !url.includes('/auth/')) window.dispatchEvent(new Event('grepui:signin'));
   let body;
   try {
     body = JSON.parse(text);

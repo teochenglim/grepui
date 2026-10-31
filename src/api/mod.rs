@@ -1,6 +1,9 @@
 //! The typed REST API (`/api/v1`). Every data route is org-scoped (R-F5).
 
+pub mod access;
 pub mod alerts;
+pub mod auth;
+pub mod authz;
 pub mod connect;
 pub mod dashboards;
 pub mod enrichment;
@@ -54,6 +57,10 @@ pub struct AppState {
     pub redact: std::sync::RwLock<HashMap<String, Arc<crate::redact::Rules>>>,
     /// `false` until the first load at startup: data responses wait rather than leak.
     pub redact_ready: std::sync::atomic::AtomicBool,
+    /// Sessions, tokens and rate limits in memory (ADR 0012).
+    pub auth: crate::auth::AuthState,
+    /// Audit rows waiting to be written.
+    pub audit: crate::audit::Audit,
 }
 
 pub type Shared = Arc<AppState>;
@@ -124,6 +131,8 @@ impl AppState {
             sender,
             redact: Default::default(),
             redact_ready: std::sync::atomic::AtomicBool::new(true),
+            auth: Default::default(),
+            audit: Default::default(),
         }))
     }
 
@@ -163,7 +172,9 @@ impl AppState {
     }
 
     pub fn admin_enabled(&self) -> Result<(), ApiError> {
-        if self.cfg.admin_writes {
+        // With sign-in the route table already demanded an org admin; `--admin-writes` is the
+        // stand-in only when there is no sign-in (ADR 0012).
+        if !self.cfg.no_auth || self.cfg.admin_writes {
             Ok(())
         } else {
             Err(ApiError(
@@ -222,6 +233,14 @@ impl AppState {
             source: "raw",
             note: None,
         })
+    }
+
+    /// `CREATE DATABASE IF NOT EXISTS` for a new org: a platform admin's action, one fixed shape.
+    pub async fn platform_ddl(&self, sql: &str) -> Result<(), ApiError> {
+        self.admin_enabled()?;
+        crate::admin::check_platform(sql)?;
+        tracing::info!(target: "audit", actor = crate::store::LOCAL_USER, %sql, "platform write");
+        self.writer.ddl(sql).await.map_err(store_error)
     }
 
     /// One call to GreptimeDB's pipeline API. `write` calls need `--admin-writes`, may only touch
@@ -284,7 +303,13 @@ pub struct Envelope<T: Serialize> {
 }
 
 pub fn ok<T: Serialize>(data: T, meta: Meta) -> Response {
-    Json(Envelope { data, meta }).into_response()
+    let rows = meta.rows;
+    let mut r = Json(Envelope { data, meta }).into_response();
+    // How many rows the answer holds, for the audit trail and clients.
+    if let Ok(v) = header::HeaderValue::from_str(&rows.to_string()) {
+        r.headers_mut().insert("x-grepui-rows", v);
+    }
+    r
 }
 
 /// Every route the router serves, with `{org}`/`{name}` placeholders. Tests walk this list
@@ -294,6 +319,24 @@ pub const ROUTES: &[&str] = &[
     "/api/v1/health",
     "/api/v1/info",
     "/api/v1/orgs",
+    "/api/v1/auth/me",
+    "/api/v1/auth/setup",
+    "/api/v1/auth/login",
+    "/api/v1/auth/logout",
+    "/api/v1/auth/password",
+    "/api/v1/auth/oidc/login",
+    "/api/v1/auth/oidc/callback",
+    "/api/v1/platform/orgs",
+    "/api/v1/platform/orgs/{org}",
+    "/api/v1/platform/users",
+    "/api/v1/platform/users/{user}",
+    "/api/v1/platform/audit",
+    "/api/v1/orgs/{org}/members",
+    "/api/v1/orgs/{org}/members/{user}",
+    "/api/v1/orgs/{org}/tokens",
+    "/api/v1/orgs/{org}/tokens/{id}",
+    "/api/v1/orgs/{org}/branding",
+    "/api/v1/orgs/{org}/audit",
     "/api/v1/orgs/{org}/streams",
     "/api/v1/orgs/{org}/streams/{name}",
     "/api/v1/orgs/{org}/streams/{name}/stats",
@@ -426,6 +469,21 @@ pub const WRITE_ROUTES: &[(&str, &str)] = &[
     ("DELETE", "/api/v1/orgs/{org}/downtimes/{id}"),
     ("POST", "/api/v1/orgs/{org}/incidents/{id}/ack"),
     ("POST", "/api/v1/orgs/{org}/incidents/{id}/resolve"),
+    ("POST", "/api/v1/auth/setup"),
+    ("POST", "/api/v1/auth/login"),
+    ("POST", "/api/v1/auth/logout"),
+    ("POST", "/api/v1/auth/password"),
+    ("POST", "/api/v1/platform/orgs"),
+    ("DELETE", "/api/v1/platform/orgs/{org}"),
+    ("POST", "/api/v1/platform/users"),
+    ("PUT", "/api/v1/platform/users/{user}"),
+    ("DELETE", "/api/v1/platform/users/{user}"),
+    ("POST", "/api/v1/orgs/{org}/members"),
+    ("PUT", "/api/v1/orgs/{org}/members/{user}"),
+    ("DELETE", "/api/v1/orgs/{org}/members/{user}"),
+    ("POST", "/api/v1/orgs/{org}/tokens"),
+    ("DELETE", "/api/v1/orgs/{org}/tokens/{id}"),
+    ("PUT", "/api/v1/orgs/{org}/branding"),
     ("POST", "/api/v1/orgs/{org}/pipelines/dry-run"),
     ("PUT", "/api/v1/orgs/{org}/pipelines/{name}"),
     ("DELETE", "/api/v1/orgs/{org}/pipelines/{name}"),
@@ -449,6 +507,54 @@ pub fn router(state: Shared) -> Router {
         .route("/api/v1/health", get(health::health))
         .route("/api/v1/info", get(info))
         .route("/api/v1/orgs", get(orgs))
+        .route("/api/v1/auth/me", get(auth::me))
+        .route("/api/v1/auth/setup", axum::routing::post(auth::setup))
+        .route("/api/v1/auth/login", axum::routing::post(auth::login))
+        .route("/api/v1/auth/logout", axum::routing::post(auth::logout))
+        .route(
+            "/api/v1/auth/password",
+            axum::routing::post(auth::change_password),
+        )
+        .route("/api/v1/auth/oidc/login", get(auth::oidc_login))
+        .route("/api/v1/auth/oidc/callback", get(auth::oidc_callback))
+        .route(
+            "/api/v1/platform/orgs",
+            get(access::platform_orgs).post(access::platform_org_create),
+        )
+        .route(
+            "/api/v1/platform/orgs/{org}",
+            axum::routing::delete(access::platform_org_delete),
+        )
+        .route(
+            "/api/v1/platform/users",
+            get(access::platform_users).post(access::platform_user_create),
+        )
+        .route(
+            "/api/v1/platform/users/{user}",
+            axum::routing::put(access::platform_user_update).delete(access::platform_user_delete),
+        )
+        .route("/api/v1/platform/audit", get(access::audit_platform))
+        .route(
+            "/api/v1/orgs/{org}/members",
+            get(access::members).post(access::member_add),
+        )
+        .route(
+            "/api/v1/orgs/{org}/members/{user}",
+            axum::routing::put(access::member_update).delete(access::member_remove),
+        )
+        .route(
+            "/api/v1/orgs/{org}/tokens",
+            get(access::tokens).post(access::token_create),
+        )
+        .route(
+            "/api/v1/orgs/{org}/tokens/{id}",
+            axum::routing::delete(access::token_revoke),
+        )
+        .route(
+            "/api/v1/orgs/{org}/branding",
+            get(access::branding).put(access::branding_set),
+        )
+        .route("/api/v1/orgs/{org}/audit", get(access::audit_org))
         .route("/api/v1/orgs/{org}/streams", get(streams::list))
         .route("/api/v1/orgs/{org}/streams/{name}", get(streams::schema))
         .route(
@@ -731,6 +837,11 @@ pub fn router(state: Shared) -> Router {
             state.clone(),
             redaction::layer,
         ))
+        // Outermost of the route layers: identify, authorize and audit before anything else.
+        .route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            authz::layer,
+        ))
         .fallback(fallback)
         .layer(axum::extract::DefaultBodyLimit::max(MAX_BODY))
         .with_state(state)
@@ -740,13 +851,29 @@ async fn info() -> Json<Value> {
     Json(json!({"name": "grepui", "version": crate::VERSION}))
 }
 
-async fn orgs(State(s): State<Shared>) -> Json<Value> {
-    let list: Vec<Value> = s
+/// The orgs the caller may see: all of them for a platform admin (or with `--no-auth`), the
+/// ones they are a member of otherwise.
+async fn orgs(
+    State(s): State<Shared>,
+    axum::Extension(id): axum::Extension<crate::auth::Identity>,
+) -> Json<Value> {
+    let mut list = vec![];
+    for o in s
         .orgs
         .list()
         .iter()
-        .map(|o| json!({"name": o.name}))
-        .collect();
+        .filter(|o| id.role_in(&o.name).is_some())
+    {
+        let b = crate::auth::store::get(&s, crate::store::build::PLATFORM_ORG, "orgdef", &o.name)
+            .await
+            .ok()
+            .flatten()
+            .and_then(|r| serde_json::from_str::<Value>(&r.spec).ok())
+            .map(|v| v["branding"].clone())
+            .filter(Value::is_object)
+            .unwrap_or(json!({}));
+        list.push(json!({"name": o.name, "role": id.role_in(&o.name).map(crate::auth::Role::name), "branding": b}));
+    }
     Json(json!({"orgs": list}))
 }
 

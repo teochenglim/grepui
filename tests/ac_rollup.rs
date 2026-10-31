@@ -275,7 +275,7 @@ fn ac_0_7_3_templates_only() {
         );
     }
     // The statement kinds are a closed, pinned list (R-F4).
-    assert_eq!(admin::ADMIN_WRITES.len(), 9);
+    assert_eq!(admin::ADMIN_WRITES.len(), 10);
     assert_eq!(admin::TEMPLATES, ["traces_red"]);
     // The flow reads only entry spans and names its sink explicitly.
     let flow = &p.create()[1];

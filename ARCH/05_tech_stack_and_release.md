@@ -13,8 +13,11 @@
 | ~~csv~~ | Not adopted in 0.10: `src/csv.rs` (RFC 4180 reader and writer, about 100 lines, tested) serves enrichment uploads and CSV redaction | |
 | rand | View ids (random 64-bit), public link tokens (OS random) | 0.3 |
 | sha2 | SHA-256 of public dashboard link tokens (already in the tree through sqlx) | 0.8 |
-| argon2 | Password hashing, tokens | 0.11 |
-| openidconnect or jsonwebtoken + reqwest (rustls) | OIDC SSO | 0.11 |
+| argon2 | Password hashing (argon2id) | 0.11 |
+| ring | Verify RS256 and ES256 ID tokens; the crypto provider of rustls | 0.11 |
+| rustls, tokio-rustls, webpki-roots | TLS client for OpenID Connect providers (no OpenSSL; the Mozilla roots are data under CDLA-Permissive-2.0, allowed in `deny.toml`) | 0.11 |
+| base64 | base64url for JWTs and secrets | 0.11 |
+| ~~openidconnect, jsonwebtoken, reqwest~~ | Not adopted in 0.11: the code flow, JWT verification and the HTTP client are in the crate on top of ring and rustls (`auth::jwt`, `auth::oidc`, `src/http.rs`) | |
 | ~~lettre~~ | Not adopted in 0.9: alert email is a 60-line plain-SMTP client (relay on a trusted network); revisit with TLS | |
 | reqwest (rustls) | HTTPS webhooks, GreptimeDB pipeline API (0.9 webhooks are plain http written in the crate) | 0.10 |
 | ~~cron~~ | Not adopted in 0.9: a five-field UTC parser is in `alerts::cron` (about 100 lines, tested) | |

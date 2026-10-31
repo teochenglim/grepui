@@ -1,14 +1,12 @@
-import * as api from '../api.js';
 import { section, navigate } from '../router.js';
-import { state } from '../state.js';
+import { session, state } from '../state.js';
 import { h } from '../util/dom.js';
 
-/** Lists the orgs the caller may see (all of them until access control lands in v0.11.0). */
+/** Lists the orgs the caller may see (the server filters the list by membership). */
 export function orgSwitcher() {
   const sel = h('select', { 'aria-label': 'Organization', title: 'Organization' }, h('option', { value: state.org }, state.org));
-  api.global('orgs').then(({ orgs }) => {
-    sel.replaceChildren(...orgs.map((o) => h('option', { value: o.name, selected: o.name === state.org }, o.name)));
-  }).catch(() => {});
+  const orgs = session.orgs.length ? session.orgs : [{ name: state.org }];
+  sel.replaceChildren(...orgs.map((o) => h('option', { value: o.name, selected: o.name === state.org }, (o.branding && o.branding.name) || o.name)));
   sel.addEventListener('change', () => {
     state.org = sel.value;
     navigate(section());

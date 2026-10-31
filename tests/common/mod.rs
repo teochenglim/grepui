@@ -325,6 +325,8 @@ pub struct MemStore {
     /// Alert items by (org, kind, item_id): the binds of the last `alert_item_put`.
     pub items: Mutex<HashMap<(String, String, String), Vec<Bind>>>,
     pub alert_history: Mutex<Vec<Vec<Bind>>>,
+    /// Audit rows (12 binds each: org, id, user, action, target, from, to, rows, status, outcome, detail, ts).
+    pub audit: Mutex<Vec<Vec<Bind>>>,
     /// Every query the reader saw (panel data included).
     pub seen: Mutex<Vec<Q>>,
     /// Answers for queries that are not state-store reads; `sample_db` when unset.
@@ -418,6 +420,39 @@ impl Reader for MemStore {
                     .collect();
                 rows.sort_by(|a, b| (&a.0, &a.1).cmp(&(&b.0, &b.1)));
                 rows.into_iter().map(|(_, _, v)| v).collect()
+            }
+            "audit_search" => {
+                let org = s_of(&q.binds[0]);
+                let (from, to) = (parse_ts(&s_of(&q.binds[1])), parse_ts(&s_of(&q.binds[2])));
+                let mut rest = q.binds[3..].iter().map(s_of);
+                let user = q
+                    .sql
+                    .contains("`username` = ?")
+                    .then(|| rest.next())
+                    .flatten();
+                let action = q
+                    .sql
+                    .contains("`action` = ?")
+                    .then(|| rest.next())
+                    .flatten();
+                let limit = q
+                    .sql
+                    .rsplit("LIMIT ")
+                    .next()
+                    .and_then(|n| n.trim().parse::<usize>().ok())
+                    .unwrap_or(100);
+                let mut rows: Vec<(i64, Value)> = self
+                    .audit
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|b| s_of(&b[0]) == org && user.as_ref().is_none_or(|u| s_of(&b[2]) == *u) && action.as_ref().is_none_or(|a| s_of(&b[3]) == *a))
+                    .map(|b| (parse_ts(&s_of(&b[11])), b))
+                    .filter(|(t, _)| *t >= from && *t < to)
+                    .map(|(t, b)| (t, json!({"id": s_of(&b[1]), "username": s_of(&b[2]), "action": s_of(&b[3]), "target": s_of(&b[4]), "from_ms": i_of(&b[5]), "to_ms": i_of(&b[6]), "rows": i_of(&b[7]), "status": i_of(&b[8]), "outcome": s_of(&b[9]), "detail": s_of(&b[10]), "at_ms": t})))
+                    .collect();
+                rows.sort_by_key(|(t, _)| std::cmp::Reverse(*t));
+                rows.into_iter().take(limit).map(|(_, v)| v).collect()
             }
             "alert_history_list" => {
                 let org = s_of(&q.binds[0]);
@@ -567,6 +602,13 @@ impl Writer for MemStore {
                 );
             }
             "alert_history_put" => self.alert_history.lock().unwrap().push(q.binds.clone()),
+            "audit_put" => {
+                let mut a = self.audit.lock().unwrap();
+                for row in q.binds.chunks(12) {
+                    a.push(row.to_vec());
+                }
+                return Ok((q.binds.len() / 12) as u64);
+            }
             "rollup_backfill" => return Ok(5),
             "enrich_insert" => return Ok((q.binds.len() / 3) as u64),
             "folder_put" => {
@@ -733,4 +775,48 @@ pub fn app_cfg(
     )
     .expect("state");
     (router(state.clone()), state)
+}
+
+/// A request with extra headers (cookies, bearer tokens) and an optional JSON body.
+pub async fn send_with(
+    app: &Router,
+    method: Method,
+    uri: &str,
+    headers: &[(&str, &str)],
+    body: Option<&Value>,
+) -> Resp {
+    let mut b = Request::builder().method(method).uri(uri);
+    for (k, v) in headers {
+        b = b.header(*k, *v);
+    }
+    if body.is_some() {
+        b = b.header("content-type", "application/json");
+    }
+    let r = app
+        .clone()
+        .oneshot(
+            b.body(Body::from(body.map(|v| v.to_string()).unwrap_or_default()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let (parts, body) = r.into_parts();
+    Resp {
+        status: parts.status,
+        headers: parts.headers,
+        body: body.collect().await.unwrap().to_bytes().to_vec(),
+    }
+}
+
+impl Resp {
+    /// The `name=value` of the first Set-Cookie, as a Cookie request header.
+    pub fn cookie(&self) -> String {
+        self.headers
+            .get_all("set-cookie")
+            .iter()
+            .filter_map(|v| v.to_str().ok())
+            .map(|v| v.split(';').next().unwrap_or_default().to_string())
+            .find(|c| !c.ends_with('='))
+            .unwrap_or_default()
+    }
 }

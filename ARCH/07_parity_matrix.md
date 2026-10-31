@@ -132,13 +132,13 @@ Status: `planned` (requirement ID and release; a row whose release is `ready` or
 
 | Feature | Evidence | Edition | grepui | Notes |
 |---|---|---|---|---|
-| Organizations | read (IAM list) | | planned R-F5, R-S5 (0.1, 0.3), R-C6 (0.11) | Multi-tenant UI; org = database mapping |
+| Organizations | read (IAM list) | | built R-F5, R-S5, R-C6 (0.1, 0.3, 0.11) | Multi-tenant UI; org = database mapping; platform admins create and delete orgs |
 | Users, roles, invites | read | | planned R-C1, 0.11 | |
-| RBAC | read | ent | planned R-C2, 0.11 | Enforced in the query layer, deny by default |
-| SSO (OIDC, Keycloak) | read | ent | planned R-C4, 0.11 | OIDC covers Keycloak |
-| Service accounts, tokens | read (IAM list) | | planned R-C3, 0.11 | |
+| RBAC | read | ent | built R-C2, 0.11 | Deny by default over every route; per-org roles (no stream or folder grain yet) |
+| SSO (OIDC, Keycloak) | read | ent | built R-C4, 0.11 | OIDC code + PKCE; endpoints configured by flags; tested with a local stand-in provider |
+| Service accounts, tokens | read (IAM list) | | built R-C3, 0.11 | |
 | Ingestion tokens | read (IAM list) | | n/a | Ingest goes to GreptimeDB, not grepui |
-| Audit trail | read | ent | planned R-C5, 0.11 | |
+| Audit trail | read | ent | built R-C5, 0.11 | |
 | Query management | read | ent | planned R-W1, 0.12 | Process list and cancel |
 | Workload management / work groups | read | ent | planned R-W2, R-W3, 0.12 | Quotas per role |
 | Quotas | read (IAM list) | | planned R-W2, 0.12 | |

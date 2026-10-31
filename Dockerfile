@@ -15,8 +15,8 @@ ENV GREPUI_VERSION=${VERSION}
 RUN cargo build --release --locked && cp target/release/grepui /grepui
 
 # ---- runtime: distroless without OpenSSL, uid 65532 ----------------------------
-# grepui does no TLS, so base-nossl keeps libssl (and its CVEs) out of the image.
-# If TLS to GreptimeDB is ever added, switch to distroless/base or cc.
+# grepui's TLS client (OpenID Connect) is rustls with the ring provider and bundled roots, so
+# base-nossl still keeps libssl (and its CVEs) out of the image.
 FROM gcr.io/distroless/base-nossl-debian12:nonroot
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="grepui" \

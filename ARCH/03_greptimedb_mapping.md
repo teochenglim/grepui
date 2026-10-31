@@ -18,7 +18,7 @@
 
 RED from raw spans is fine for minutes and hours but slow over days. grepui uses GreptimeDB Flow (verified on v1.3.0, ADR 0008):
 
-1. The Rollups page (or `POST /rollups/traces_red`) creates the sink `<traces_table>_red_1m` (service_name tag, `time_window` TIMESTAMP(3), requests, errors, sum_ns, max_ns) and a flow `grepui_<db>_red_1m` that fills it per minute from server and consumer spans. `docs/rollup.sql` shows the same DDL for use outside grepui.
+1. The Rollups page (or `POST /rollups/traces_red`) creates the sink `<traces_table>_red_1m` (service_name tag, `time_window` TIMESTAMP(3), requests, errors, sum_ns, max_ns) and a flow `grepui_<db>_red_1m` that fills it per minute from server and consumer spans. `scripts/rollup.sql` shows the same DDL for use outside grepui.
 2. The planner (R-P1) reads the sink for windows over 24 hours when it exists (Services list, catalog, per-service summary and series), reports `meta.source = rollup_1m`, and falls back to raw spans with a warning when it does not. Operations and dependencies always read raw spans.
 3. Raw spans can then use a short TTL while the rollup keeps months (Retention page).
 
@@ -32,7 +32,7 @@ Written from docs, not yet executed (see AGENTS.md rule on testing against the p
 - `CAST(timestamp AS BIGINT)` returning ns for `TIMESTAMP(9)`.
 - `matches_term(body, 'x')` and `json_get_string(log_attributes, 'key')`; dotted keys may need path syntax.
 - The parent/child join in `dependencies` on large ranges; a Flow sink may be needed.
-- Flow DDL in `docs/rollup.sql`.
+- Flow DDL in `scripts/rollup.sql`.
 - Not supported yet: the `greptime_trace_v2` schema (JSON2 attribute columns).
 
 Each is one function in the query builders, so a dialect fix is a small edit. `_live` tests (`make test-db`) cover each in the release that needs it.

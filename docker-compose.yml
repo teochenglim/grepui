@@ -13,7 +13,7 @@ services:
   grepui:
     image: ${GREPUI_IMAGE:-ghcr.io/teochenglim/grepui:latest}
     build: .
-    command: ["playground", "--wait", "90", "--demo-data", "--admin-writes"]
+    command: ["playground", "--wait", "90", "--demo-data"]
     environment:
       GREPTIME_MYSQL: mysql://root@greptimedb:4002/demo
       # Where the playground writes demo data (compose-internal).

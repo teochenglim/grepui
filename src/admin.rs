@@ -21,6 +21,7 @@ pub const ADMIN_WRITES: &[&str] = &[
     "CREATE TABLE (enrichment)",
     "INSERT INTO enrichment table VALUES",
     "DROP TABLE (enrichment)",
+    "CREATE DATABASE (org, platform)",
 ];
 
 /// Rollup templates. Metrics downsampling is a later template (ROADMAP).
@@ -341,6 +342,32 @@ pub fn rollup_flow(flow: &str) -> Q {
 }
 
 // ---- the gate --------------------------------------------------------------------------
+
+/// The one platform statement: create an org's database. Name validated, reserved names refused.
+pub fn check_platform(sql: &str) -> Result<(), ApiError> {
+    let denied = || {
+        ApiError(
+            axum::http::StatusCode::FORBIDDEN,
+            "refusing a platform statement that is not from a template".into(),
+        )
+    };
+    let name = sql
+        .strip_prefix("CREATE DATABASE IF NOT EXISTS `")
+        .and_then(|r| r.strip_suffix('`'))
+        .ok_or_else(denied)?;
+    if ident(name).is_err()
+        || [
+            "information_schema",
+            "greptime_private",
+            "pg_catalog",
+            "public",
+        ]
+        .contains(&name)
+    {
+        return Err(denied());
+    }
+    Ok(())
+}
 
 /// Accept only a statement this module generates for `org`. Called right before the writer runs.
 pub fn check(sql: &str, binds: usize, org: &Org) -> Result<(), ApiError> {

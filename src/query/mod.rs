@@ -36,6 +36,7 @@ pub const WRITE_TARGETS: &[&str] = &[
     "grepui_shares",
     "grepui_alert_items",
     "grepui_alert_history",
+    "grepui_audit",
 ];
 
 #[derive(Debug, Clone, PartialEq)]

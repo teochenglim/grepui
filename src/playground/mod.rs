@@ -244,6 +244,47 @@ pub async fn seed_demo_function(reader: &SqlxReader, meta_db: &str, org: &str) -
     Ok(())
 }
 
+/// The demo sign-in: user `admin`, password from `GREPUI_DEMO_ADMIN_PASSWORD` or a fixed demo one.
+/// Only the playground creates it, and only when there are no users yet.
+pub async fn seed_demo_admin(reader: &SqlxReader, meta_db: &str) -> Result<()> {
+    use crate::store::{build, check_write};
+    let (rows, _) = crate::query::run(
+        reader,
+        build::item_list(meta_db, build::PLATFORM_ORG, "user")?,
+    )
+    .await?;
+    if !rows.is_empty() {
+        return Ok(());
+    }
+    let pw =
+        std::env::var("GREPUI_DEMO_ADMIN_PASSWORD").unwrap_or_else(|_| "grepui-demo-admin".into());
+    let u = crate::auth::User {
+        username: "admin".into(),
+        display: "demo admin".into(),
+        password_hash: crate::auth::password::hash(&pw).map_err(|e| anyhow::anyhow!(e))?,
+        platform_admin: true,
+        source: "local".into(),
+        ..Default::default()
+    };
+    let now = (now_ns() / 1_000_000) as i64;
+    let row = build::ItemRow {
+        item_id: "admin".into(),
+        name: "admin".into(),
+        spec: serde_json::to_string(&u)?,
+        owner: "platform".into(),
+        created_ms: now,
+        updated_ms: now,
+        deleted: false,
+    };
+    let q = build::item_put(meta_db, build::PLATFORM_ORG, "user", &row)?;
+    check_write(&q, meta_db)?;
+    crate::query::Writer::exec(reader, &q)
+        .await
+        .map_err(|e| anyhow::anyhow!("could not create the demo admin: {}", e.detail()))?;
+    tracing::info!("playground: sign in as admin / {pw} (demo only)");
+    Ok(())
+}
+
 /// Everything before serving: wait, guard, seed, start the live trickle.
 pub async fn prepare(cfg: &Config, o: &Opts) -> Result<()> {
     cfg.validate()?;
@@ -262,6 +303,11 @@ pub async fn prepare(cfg: &Config, o: &Opts) -> Result<()> {
         seed_demo_dashboard(reader.as_ref(), &cfg.meta_database, crate::org::DEFAULT_ORG).await
     {
         tracing::warn!(error = %e, "playground: no demo dashboard");
+    }
+    if !cfg.no_auth
+        && let Err(e) = seed_demo_admin(reader.as_ref(), &cfg.meta_database).await
+    {
+        tracing::warn!(error = %e, "playground: no demo admin");
     }
     if let Err(e) =
         seed_demo_alert(reader.as_ref(), &cfg.meta_database, crate::org::DEFAULT_ORG).await

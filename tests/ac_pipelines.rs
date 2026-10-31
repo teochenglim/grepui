@@ -962,7 +962,7 @@ fn ac_0_10_3_admin_gate_accepts_only_generated_statements() {
             "{bad}"
         );
     }
-    assert_eq!(admin::ADMIN_WRITES.len(), 9);
+    assert_eq!(admin::ADMIN_WRITES.len(), 10);
 }
 
 fn enrich_app(admin: bool, existing: Vec<&'static str>) -> (Router, Arc<MemStore>) {

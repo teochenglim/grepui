@@ -89,23 +89,6 @@ fn role_of(s: &Shared, template: &str) -> &'static str {
     }
 }
 
-/// Percent-decode one path segment the way the router does before a handler sees it.
-fn decode(seg: &str) -> Option<String> {
-    let b = seg.as_bytes();
-    let (mut out, mut i) = (Vec::with_capacity(b.len()), 0);
-    while i < b.len() {
-        if b[i] == b'%' {
-            let h = std::str::from_utf8(b.get(i + 1..i + 3)?).ok()?;
-            out.push(u8::from_str_radix(h, 16).ok()?);
-            i += 3;
-        } else {
-            out.push(b[i]);
-            i += 1;
-        }
-    }
-    String::from_utf8(out).ok()
-}
-
 const RULE_ROUTES: &[&str] = &[
     "/api/v1/orgs/{org}/redaction",
     "/api/v1/orgs/{org}/redaction/{id}",
@@ -127,6 +110,7 @@ pub async fn layer(State(s): State<Shared>, req: Request, next: Next) -> Respons
         .get::<MatchedPath>()
         .map(|m| m.as_str().to_string())
         .unwrap_or_default();
+    let ident = req.extensions().get::<crate::auth::Identity>().cloned();
     let res = next.run(req).await;
     let data_route =
         template.starts_with("/api/v1/orgs/{org}/") && !RULE_ROUTES.contains(&template.as_str());
@@ -160,7 +144,7 @@ pub async fn layer(State(s): State<Shared>, req: Request, next: Next) -> Respons
     let Some(org) = path
         .split('/')
         .nth(4)
-        .and_then(decode)
+        .and_then(super::authz::decode)
         .and_then(|o| s.orgs.resolve(&o).ok().map(|o| o.name.clone()))
     else {
         return (
@@ -170,7 +154,18 @@ pub async fn layer(State(s): State<Shared>, req: Request, next: Next) -> Respons
             .into_response();
     };
     let rules = s.redact.read().ok().and_then(|m| m.get(&org).cloned());
-    let role = role_of(&s, &template);
+    // With sign-in the role is the caller's role in the org (public links and anyone below admin
+    // are viewers); without it, the `--admin-writes` stand-in decides.
+    let role = match &ident {
+        Some(i) if i.kind != "local" => {
+            if !template.contains("/public/") && i.role_in(&org) == Some(crate::auth::Role::Admin) {
+                "admin"
+            } else {
+                "viewer"
+            }
+        }
+        _ => role_of(&s, &template),
+    };
     let Some(rules) = rules.filter(|r| !r.is_empty_for(role)) else {
         return res;
     };

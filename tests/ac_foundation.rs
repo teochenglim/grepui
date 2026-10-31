@@ -261,6 +261,7 @@ fn fill(route: &str) -> String {
         .replace("{token}", "0123456789abcdef0123456789abcdef")
         .replace("{stream}", "traces")
         .replace("{id}", "0123456789abcdef")
+        .replace("{user}", "alice")
         .replace("{trace_id}", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 }
 
@@ -311,7 +312,15 @@ async fn ac_0_1_4_every_listed_route_exists() {
             || route.ends_with("/downtimes/{id}")
             || route.ends_with("/dry-run")
             || route.ends_with("/functions/{name}")
-            || route.ends_with("/redaction/{id}");
+            || route.ends_with("/redaction/{id}")
+            || route.ends_with("/auth/setup")
+            || route.ends_with("/auth/login")
+            || route.ends_with("/auth/logout")
+            || route.ends_with("/auth/password")
+            || route.ends_with("/platform/orgs/{org}")
+            || route.ends_with("/platform/users/{user}")
+            || route.ends_with("/members/{user}")
+            || route.ends_with("/tokens/{id}");
         if !write_only {
             assert_ne!(r.status, StatusCode::METHOD_NOT_ALLOWED, "{route}");
         }
@@ -365,7 +374,8 @@ fn ac_0_1_4_write_allowlist_is_pinned() {
             "grepui_dashboards",
             "grepui_shares",
             "grepui_alert_items",
-            "grepui_alert_history"
+            "grepui_alert_history",
+            "grepui_audit"
         ]
     );
 }
@@ -391,7 +401,7 @@ async fn ac_0_1_5_org_routes_resolve_default() {
     );
     assert_eq!(
         get(&a, "/api/v1/orgs").await.json()["orgs"],
-        json!([{"name": "default"}])
+        json!([{"name": "default", "role": "admin", "branding": {}}])
     );
 }
 

@@ -2,7 +2,7 @@
 //! The resolved database comes from configuration, never from request text.
 
 use crate::{config::Config, error::ApiError};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::RwLock};
 
 pub const DEFAULT_ORG: &str = "default";
 
@@ -14,8 +14,12 @@ pub struct Org {
     pub logs_table: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct Orgs(BTreeMap<String, Org>);
+/// The orgs this process serves. `default` comes from the flags; others come from the state
+/// store (v0.11.0) and are reloaded as they change. An `Org` is leaked once per distinct
+/// definition so handlers can keep borrowing `&Org` across awaits; orgs are few and a definition
+/// only changes when a platform admin edits it.
+#[derive(Debug)]
+pub struct Orgs(RwLock<BTreeMap<String, &'static Org>>);
 
 /// Lowercase letters, digits, `-` and `_`; 1..=32 chars; starts alphanumeric.
 pub fn valid_name(s: &str) -> bool {
@@ -28,7 +32,7 @@ pub fn valid_name(s: &str) -> bool {
 }
 
 impl Orgs {
-    /// One `default` org from the flags. Metadata-backed orgs arrive with v0.11.0.
+    /// One `default` org from the flags.
     pub fn from_config(cfg: &Config) -> anyhow::Result<Orgs> {
         let org = Org {
             name: DEFAULT_ORG.into(),
@@ -36,19 +40,45 @@ impl Orgs {
             traces_table: cfg.traces_table.clone(),
             logs_table: cfg.logs_table.clone(),
         };
-        Ok(Orgs(BTreeMap::from([(org.name.clone(), org)])))
+        let o = Orgs(RwLock::new(BTreeMap::new()));
+        o.set(org);
+        Ok(o)
     }
 
-    pub fn resolve(&self, name: &str) -> Result<&Org, ApiError> {
+    pub fn resolve(&self, name: &str) -> Result<&'static Org, ApiError> {
         if !valid_name(name) {
             return Err(ApiError::bad("invalid org name"));
         }
         self.0
-            .get(name)
+            .read()
+            .ok()
+            .and_then(|m| m.get(name).copied())
             .ok_or_else(|| ApiError::not_found("unknown org"))
     }
 
-    pub fn list(&self) -> Vec<&Org> {
-        self.0.values().collect()
+    pub fn list(&self) -> Vec<&'static Org> {
+        self.0
+            .read()
+            .map(|m| m.values().copied().collect())
+            .unwrap_or_default()
+    }
+
+    /// Add or replace an org; an identical definition keeps the existing one.
+    pub fn set(&self, org: Org) {
+        let Ok(mut m) = self.0.write() else { return };
+        if m.get(&org.name).is_some_and(|o| **o == org) {
+            return;
+        }
+        m.insert(org.name.clone(), Box::leak(Box::new(org)));
+    }
+
+    /// Forget an org (never `default`).
+    pub fn remove(&self, name: &str) {
+        if name == DEFAULT_ORG {
+            return;
+        }
+        if let Ok(mut m) = self.0.write() {
+            m.remove(name);
+        }
     }
 }

@@ -31,8 +31,26 @@ pub fn startup_decision(state: &Result<SchemaState>) -> Result<Option<String>> {
     })
 }
 
+/// Is `listen` (host:port) a loopback address?
+pub fn is_loopback(listen: &str) -> bool {
+    let host = listen
+        .rsplit_once(':')
+        .map_or(listen, |(h, _)| h)
+        .trim_matches(['[', ']']);
+    host == "localhost"
+        || host
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
+}
+
 pub async fn serve(cfg: Config) -> Result<()> {
     cfg.validate()?;
+    if cfg.no_auth && !is_loopback(&cfg.listen) {
+        bail!(
+            "--no-auth is only allowed on a loopback address (127.0.0.1, ::1, localhost); {} is reachable by others. Remove --no-auth to use sign-in.",
+            cfg.listen
+        );
+    }
     let reader = reader_for(&cfg)?;
     let state = store::schema_state(reader.as_ref(), &cfg.meta_database).await;
     if let Some(warning) = startup_decision(&state)? {
@@ -40,6 +58,16 @@ pub async fn serve(cfg: Config) -> Result<()> {
     }
     let listen = cfg.listen.clone();
     let app = api::AppState::with_parts(cfg, reader.clone(), reader, system_clock())?;
+    // Orgs created by platform admins are loaded before the first request and kept fresh.
+    if let Err(e) = api::access::reload_orgs(&app).await {
+        tracing::warn!(error = %e.1, "could not load orgs yet");
+    }
+    api::access::spawn_org_refresh(app.clone());
+    if app.cfg.no_auth {
+        tracing::warn!(
+            "sign-in is switched off (--no-auth): everyone is an admin and nothing is audited"
+        );
+    }
     // Redaction rules are loaded before the first request is served and kept fresh after.
     api::redaction::spawn_refresh(app.clone());
     if !app.cfg.no_alerts {

@@ -27,10 +27,15 @@ import { retentionPage } from './pages/retention.js';
 import { rollupsPage } from './pages/rollups.js';
 import { streamDetailPage } from './pages/stream-detail.js';
 import { streamsPage } from './pages/streams.js';
-import { route, start } from './router.js';
+import { loginPage } from './pages/login.js';
+import { adminPage } from './pages/admin.js';
+import { platformPage } from './pages/platform.js';
+import { applyBranding } from './components/branding.js';
+import { parseHash, route, start } from './router.js';
+import { session, state } from './state.js';
 
-const shell = buildShell(document.getElementById('app'));
-
+route('admin', adminPage);
+route('platform', platformPage);
 route('logs', logsPage);
 route('traces', tracesPage);
 route('traces/:id', traceDetailPage);
@@ -57,10 +62,45 @@ route('retention', retentionPage);
 route('health', healthPage);
 route('*', notFound);
 
-start(shell.view, {
-  beforeRender: (parts) => {
-    document.body.classList.remove('tv');
-    api.resetQueries();
-    shell.paintNav(parts);
-  },
-});
+async function boot() {
+  const app = document.getElementById('app');
+  const isPublic = parseHash().parts[1] === 'public';
+  let me = null;
+  try {
+    me = (await api.global('auth/me')).data;
+  } catch {
+    me = null;
+  }
+  // A public dashboard link needs no sign-in; everything else does (unless --no-auth).
+  if (me && !isPublic && !me.authenticated && !me.no_auth) {
+    loginPage(app, me, () => location.reload());
+    return;
+  }
+  session.me = me;
+  if (me && (me.authenticated || me.no_auth)) {
+    try {
+      session.orgs = (await api.global('orgs')).orgs;
+    } catch {
+      session.orgs = [];
+    }
+    // Land in an org the person may use.
+    const [org] = parseHash().parts;
+    if (session.orgs.length && !session.orgs.some((o) => o.name === org) && !isPublic) {
+      state.org = session.orgs[0].name;
+      location.hash = `#/${state.org}/logs`;
+    }
+  }
+  window.addEventListener('grepui:signin', () => location.reload(), { once: true });
+  const shell = buildShell(app);
+  applyBranding(state.org);
+  start(shell.view, {
+    beforeRender: (parts) => {
+      document.body.classList.remove('tv');
+      api.resetQueries();
+      shell.paintNav(parts);
+      applyBranding(state.org);
+    },
+  });
+}
+
+boot();

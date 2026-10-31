@@ -56,6 +56,46 @@ pub struct Config {
     /// GreptimeDB HTTP address grepui itself calls for pipelines (default: --greptime-http-public).
     #[arg(long, env = "GREPUI_PIPELINE_HTTP")]
     pub pipeline_http: Option<String>,
+    /// No sign-in: everyone is an admin. Local use only; refused on a non-loopback address.
+    #[arg(long, env = "GREPUI_NO_AUTH")]
+    pub no_auth: bool,
+    /// How long a sign-in lasts, in hours.
+    #[arg(long, env = "GREPUI_SESSION_HOURS", default_value_t = 12)]
+    pub session_hours: u64,
+    /// Requests per minute one API token may make.
+    #[arg(long, env = "GREPUI_TOKEN_RATE", default_value_t = 600)]
+    pub token_rate_per_min: u32,
+    /// OpenID Connect: the issuer (`iss` of the ID tokens).
+    #[arg(long, env = "GREPUI_OIDC_ISSUER")]
+    pub oidc_issuer: Option<String>,
+    #[arg(long, env = "GREPUI_OIDC_CLIENT_ID")]
+    pub oidc_client_id: Option<String>,
+    #[arg(long, env = "GREPUI_OIDC_CLIENT_SECRET")]
+    pub oidc_client_secret: Option<String>,
+    /// The provider's authorization endpoint.
+    #[arg(long, env = "GREPUI_OIDC_AUTH_URL")]
+    pub oidc_auth_url: Option<String>,
+    /// The provider's token endpoint (http:// or https://).
+    #[arg(long, env = "GREPUI_OIDC_TOKEN_URL")]
+    pub oidc_token_url: Option<String>,
+    /// The provider's JWKS endpoint.
+    #[arg(long, env = "GREPUI_OIDC_JWKS_URL")]
+    pub oidc_jwks_url: Option<String>,
+    /// This grepui's callback, e.g. https://grepui.example.com/api/v1/auth/oidc/callback.
+    #[arg(long, env = "GREPUI_OIDC_REDIRECT_URL")]
+    pub oidc_redirect_url: Option<String>,
+    #[arg(
+        long,
+        env = "GREPUI_OIDC_SCOPES",
+        default_value = "openid profile email"
+    )]
+    pub oidc_scopes: String,
+    /// The claim that carries groups or roles.
+    #[arg(long, env = "GREPUI_OIDC_ROLE_CLAIM", default_value = "groups")]
+    pub oidc_role_claim: String,
+    /// `value=role@org` (viewer, editor, admin) or `value=platform_admin`; repeat or separate with `;`.
+    #[arg(long, env = "GREPUI_OIDC_ROLE_MAP", value_delimiter = ';')]
+    pub oidc_role_map: Vec<String>,
     /// Per-query timeout in seconds.
     #[arg(long, env = "GREPUI_QUERY_TIMEOUT_SECS", default_value_t = 30)]
     pub query_timeout_secs: u64,
@@ -72,6 +112,20 @@ impl Default for Config {
             meta_database: "grepui".into(),
             admin_writes: false,
             no_alerts: false,
+            // Library and test default: no sign-in. The command line defaults to sign-in required.
+            no_auth: true,
+            session_hours: 12,
+            token_rate_per_min: 600,
+            oidc_issuer: None,
+            oidc_client_id: None,
+            oidc_client_secret: None,
+            oidc_auth_url: None,
+            oidc_token_url: None,
+            oidc_jwks_url: None,
+            oidc_redirect_url: None,
+            oidc_scopes: "openid profile email".into(),
+            oidc_role_claim: "groups".into(),
+            oidc_role_map: vec![],
             pipeline_http: None,
             smtp: None,
             smtp_from: "grepui@localhost.localdomain".into(),
@@ -112,6 +166,40 @@ impl Config {
                 self.meta_database
             )
         })?;
+        let oidc = [
+            &self.oidc_issuer,
+            &self.oidc_client_id,
+            &self.oidc_auth_url,
+            &self.oidc_token_url,
+            &self.oidc_jwks_url,
+            &self.oidc_redirect_url,
+        ];
+        if oidc.iter().any(|o| o.is_some()) {
+            if oidc.iter().any(|o| o.is_none()) {
+                anyhow::bail!(
+                    "--oidc-issuer, --oidc-client-id, --oidc-auth-url, --oidc-token-url, --oidc-jwks-url and --oidc-redirect-url must be set together"
+                );
+            }
+            for u in [
+                &self.oidc_auth_url,
+                &self.oidc_token_url,
+                &self.oidc_jwks_url,
+                &self.oidc_redirect_url,
+            ]
+            .into_iter()
+            .flatten()
+            {
+                let p = url::Url::parse(u)
+                    .map_err(|_| anyhow::anyhow!("an --oidc URL is not valid: {u}"))?;
+                if !matches!(p.scheme(), "http" | "https") {
+                    anyhow::bail!("--oidc URLs must be http:// or https://");
+                }
+            }
+            for r in &self.oidc_role_map {
+                crate::auth::oidc::parse_rule(r)
+                    .map_err(|e| anyhow::anyhow!("--oidc-role-map {r:?}: {e}"))?;
+            }
+        }
         if let Some(a) = &self.smtp {
             crate::alerts::notify::Smtp::parse(a, &self.smtp_from)
                 .map_err(|e| anyhow::anyhow!("--smtp: {e}"))?;
