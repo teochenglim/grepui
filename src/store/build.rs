@@ -423,6 +423,9 @@ pub const ITEM_KINDS: &[&str] = &[
     "incident",
     "state",
     "lease",
+    // v0.10.0: small per-org settings share the table.
+    "function",
+    "redaction",
 ];
 
 fn item_kind(kind: &str) -> Result<Bind> {

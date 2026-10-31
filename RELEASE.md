@@ -2,7 +2,7 @@
 
 The single place to see where grepui stands: what is shipped, what is planned, what each release proves, and how a release is cut. Per-release detail (scope, acceptance criteria, named tests, checklist) lives in [`RELEASE/vX.Y.Z.md`](RELEASE/README.md); this file is the readable roll-up and the changelog.
 
-> **Current state:** v0.1.0 to v0.9.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.10.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
+> **Current state:** v0.1.0 to v0.10.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.11.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
 
 ## 1. Summary
 
@@ -21,7 +21,7 @@ grepui is a multi-tenant observability UI for GreptimeDB: one Rust binary (axum)
 
 ## 2. Release status
 
-Latest built: **v0.9.0: Alerts and incidents** (ready). Newest first.
+Latest built: **v0.10.0: Pipelines, functions, enrichment, redaction** (ready). Newest first.
 
 | Release | Theme | Status | ACs | Requirements covered |
 |---|---|---|---|---|
@@ -29,7 +29,7 @@ Latest built: **v0.9.0: Alerts and incidents** (ready). Newest first.
 | [v0.13.0](RELEASE/v0.13.0.md) | Reports, RUM view and operate | planned | 5 | R-E1 R-O1 R-O2 R-O3 R-U1 |
 | [v0.12.0](RELEASE/v0.12.0.md) | Query management, work groups and federation | planned | 5 | R-W1 R-W2 R-W3 R-Y1 R-Y2 |
 | [v0.11.0](RELEASE/v0.11.0.md) | Access control, multi-tenancy, SSO and audit | planned | 7 | R-C1 R-C2 R-C3 R-C4 R-C5 R-C6 |
-| [v0.10.0](RELEASE/v0.10.0.md) | Pipelines, functions, enrichment, redaction | planned | 4 | R-F4 R-N1 R-N2 R-N3 R-N4 |
+| [v0.10.0](RELEASE/v0.10.0.md) | Pipelines, functions, enrichment, redaction | ready | 4 | R-F4 R-N1 R-N2 R-N3 R-N4 |
 | [v0.9.0](RELEASE/v0.9.0.md) | Alerts and incidents | ready | 8 | R-A1 R-A2 R-A3 R-A4 R-A5 R-A6 R-A7 R-A8 |
 | [v0.8.0](RELEASE/v0.8.0.md) | Dashboards | ready | 6 | R-B1 R-B2 R-B3 R-B4 R-B5 R-B6 |
 | [v0.7.0](RELEASE/v0.7.0.md) | Rollups and extended retention | ready | 4 | R-F4 R-P1 R-P2 R-P3 R-X1 |
@@ -60,6 +60,12 @@ Newest first. An entry is written when a release becomes `ready`; the same text 
 ### Unreleased
 
 - Requirements, architecture, positioning and parity matrix (ARCH 00–07), release plan with ACs for v0.1.0–v1.0.0, `scripts/seed.py` (demo traces and logs over OTLP/protobuf, `--db` per org).
+
+### v0.10.0: Pipelines, functions, enrichment, redaction (ready)
+
+Added: a pipelines manager over GreptimeDB's pipeline API (list, versions, save, delete, dry-run with stored or inline YAML; per-org names `<org>.<name>`; writes need `--admin-writes` and are logged); saved SQL functions called as `@name(1, 'x')` in SQL mode and dashboard SQL panels with bound arguments and no recursion; enrichment tables from CSV (`enrich_<name>`, inferred types, optional key, replace) with a join helper for SQL mode; redaction rules per field (`full`, `partial`, `hash`) applied by one layer to every response and export, including JSON attributes (ADR 0011). Four new UI pages. Schema stays version 4; new flag `--pipeline-http`; no new dependency.
+
+Limits: no roles until v0.11.0 (`admin` = started with `--admin-writes`; public links are always viewers); redaction does not see renamed columns or free text; rule changes reach other replicas in about 5 s. Verified live on v1.3.0 (pipeline lifecycle against the real API, enrichment join with exact per-tier counts, function with a bound argument against the same count as the inline query, redaction of a real log response) and in a browser (pipelines with dry-run and save, enrichment with the join helper); not exercised in a browser: delete buttons, the file chooser, the function and redaction forms.
 
 ### v0.9.0: Alerts and incidents (ready)
 
@@ -139,15 +145,15 @@ Will add: Local users, organizations (tenants), roles, sessions; multi-tenant UI
 
 Replaces the earlier plan for a single `--basic-auth` flag. `--no-auth` exists for local use and is refused when listening on a non-loopback address.
 
-### v0.10.0: Pipelines, functions, enrichment, redaction (planned)
+### v0.10.0: Pipelines, functions, enrichment, redaction (ready)
 
-Will add: Pipelines manager over GreptimeDB's pipeline API with dry-run; Saved SQL functions; Enrichment tables from CSV; Redaction rules per field and role.
+Built: Pipelines manager over GreptimeDB's pipeline API with dry-run; saved SQL functions; enrichment tables from CSV; redaction rules per field and role.
 
 GreptimeDB pipelines are YAML-configured, not VRL scripts; this is a documented difference. Cipher-key field encryption is not implemented (redaction only).
 
-### v0.9.0: Alerts and incidents (planned)
+### v0.9.0: Alerts and incidents (ready)
 
-Will add: Rule engine: builder/SQL/PromQL, interval or cron, look-back, cooldown; Real-time (short interval) and composite alerts; anomaly alerts; Destinations, templates, test-send; dedup, compare-with-past, downtimes, history; Incidents; leader lease for HA.
+Built: Rule engine: builder/SQL/PromQL, interval or cron, look-back, cooldown; Real-time (short interval) and composite alerts; anomaly alerts; Destinations, templates, test-send; dedup, compare-with-past, downtimes, history; Incidents; leader lease for HA.
 
 Real-time here means short-interval polling of GreptimeDB (default 10 s), not an ingest hook; ARCH 07 states the difference.
 
@@ -169,6 +175,7 @@ Honest ledger of what has actually been run. Updated as releases land.
 | OpenInference spans on trace v2 (JSON2) | spike on v1.3.0: stored with 19 fixed columns (300 indexed messages and a 200 KB prompt in one span), queried with `json_get_*(col, '["key"]')`; grepui's trace list/waterfall/logs work on a v2 table, its span panel and attribute filters do not yet (roadmap LLM track L1) |
 | CI-parity run (fresh `make db-down db-up`, seed, `make test-db`) | green for every live test after the v0.4.0 fixes; it reproduced the v0.3.0 CI failure and found the join bug below |
 | **GreptimeDB v1.2.1: `IN (subquery)`, `EXISTS` and self-joins on a telemetry table return wrong, nondeterministic rows** | verified live (4 / 6 / 5 / 0 for a true 33); no such query is used (ADR 0007); the v0.5.0 dependency self-join is verified correct on v1.3.0 (`ac_0_5_3_dependencies_live`) |
+| Pipelines, functions, enrichment, redaction (v0.10.0) | pipeline create/version/dry-run/delete verified live against GreptimeDB v1.3.0 (`ac_0_10_1_pipeline_live`); enrichment upload and the join helper verified live with exact per-tier counts (`ac_0_10_3_enrichment_join_live`); bound function arguments verified live; redaction verified on a live response; pipelines also tested against a local stand-in for the HTTP API; the role model is a stand-in (admin = `--admin-writes`) |
 | Alerts: rule evaluation, dedup, cooldown, downtimes, incidents, history, lease between two replicas, webhook delivery, SMTP (v0.9.0) | verified live (exact counts per service and builder count against the generator, lease handover on v1.3.0, the demo rule fires, dedups and opens an incident) and in a browser; webhook and SMTP are tested against local fake servers only, never a real mail relay or an https endpoint; the lease is not compare-and-set |
 | Dashboards: save, reload, variables bound as parameters, panel shapes, compare, public links, cascade delete, import and export (v0.8.0) | verified live (exact panel numbers against the generator, hostile variable values as plain values, real state store) and in a browser; the HTML sanitiser is hand written and covered by an attack-string test |
 | Rollup planner, rollup create/backfill/drop, retention preview and TTL set (v0.7.0) | verified live (exact sink contents, flow keeps up, idempotent backfill, exact preview) and in a browser; flow type on v1.3.0 is batching |

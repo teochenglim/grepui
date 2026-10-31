@@ -26,7 +26,7 @@ Status: `planned` (requirement ID and release; a row whose release is `ready` or
 | Explain and Analyze query | nav | | planned via R-L5 (`EXPLAIN`) | |
 | Refresh cache / run query | nav | | planned R-O1, 0.13 | Cache bypass parameter |
 | Cross-linking between signals | nav | | built R-R6, 0.4 | D1 |
-| VRL functions on logs | read | | differs R-N2, 0.10 | Saved SQL functions, no VRL |
+| VRL functions on logs | read | | built (differs) R-N2, 0.10 | Saved SQL functions, bound arguments, no recursion, no VRL |
 | Insights (root-cause analysis over anomaly periods) | nav | | gap | Revisit after 1.0 |
 | Log patterns | nav | | gap | Revisit after 1.0 |
 | Live tail | unconfirmed | | gap | Polling model; revisit after 1.0 |
@@ -95,12 +95,12 @@ Status: `planned` (requirement ID and release; a row whose release is `ready` or
 
 | Feature | Evidence | Edition | grepui | Notes |
 |---|---|---|---|---|
-| Real-time pipelines (transform, filter, route at ingest) | read | | differs R-N1, 0.10 | Manages GreptimeDB pipelines (YAML), with dry-run |
+| Real-time pipelines (transform, filter, route at ingest) | read | | built (differs) R-N1, 0.10 | Manages GreptimeDB pipelines (YAML), with dry-run; per-org names |
 | Scheduled pipelines | read (title) | | differs R-P3, 0.7 | Flow templates |
 | Remote destinations, workflows, import/export of pipelines | nav | | gap | |
-| VRL functions at ingest or query time | read | | differs R-N2, 0.10 | Saved SQL functions |
-| Enrichment tables | nav | | planned R-N3, 0.10 | |
-| Sensitive data redaction | unconfirmed (use case only) | | planned R-N4, 0.10 | |
+| VRL functions at ingest or query time | read | | built (differs) R-N2, 0.10 | Saved SQL functions, bound arguments, no recursion |
+| Enrichment tables | nav | | built R-N3, 0.10 | CSV upload with join helper |
+| Sensitive data redaction | unconfirmed (use case only) | | built R-N4, 0.10 | One response layer; roles are a stand-in until 0.11 |
 
 ## Streams and retention
 

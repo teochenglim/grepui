@@ -568,6 +568,7 @@ impl Writer for MemStore {
             }
             "alert_history_put" => self.alert_history.lock().unwrap().push(q.binds.clone()),
             "rollup_backfill" => return Ok(5),
+            "enrich_insert" => return Ok((q.binds.len() / 3) as u64),
             "folder_put" => {
                 self.folders
                     .lock()
@@ -712,6 +713,23 @@ pub fn alert_app(
         store.clone(),
         Arc::new(move || c.load(Ordering::SeqCst)),
         rec.clone(),
+    )
+    .expect("state");
+    (router(state.clone()), state)
+}
+
+/// An app and its state for a given config, sharing a store and a clock.
+pub fn app_cfg(
+    store: &Arc<MemStore>,
+    clock: &Arc<AtomicI64>,
+    cfg: Config,
+) -> (Router, grepui::api::Shared) {
+    let c = clock.clone();
+    let state = AppState::with_parts(
+        cfg,
+        store.clone(),
+        store.clone(),
+        Arc::new(move || c.load(Ordering::SeqCst)),
     )
     .expect("state");
     (router(state.clone()), state)

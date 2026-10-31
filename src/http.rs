@@ -1,6 +1,6 @@
-//! A tiny HTTP/1.1 client over a TCP stream: one POST, `Connection: close`. Playground only;
-//! it is the single place the binary writes to GreptimeDB, and only demo data. No TLS: the
-//! playground talks to a local or compose-internal GreptimeDB.
+//! A tiny HTTP/1.1 client over a TCP stream: one request, `Connection: close`. Used by the
+//! playground (demo data) and by the pipeline manager (GreptimeDB's pipeline API, admin writes
+//! only). No TLS: GreptimeDB is reached on a local or compose-internal address.
 
 use anyhow::{Context, Result, bail};
 use std::time::Duration;
@@ -17,6 +17,20 @@ pub async fn post(
     headers: &[(&str, &str)],
     body: &[u8],
 ) -> Result<(u16, String)> {
+    request("POST", base, path, headers, body).await
+}
+
+/// Any method; `path` includes the query string, which the caller has percent-encoded.
+pub async fn request(
+    method: &str,
+    base: &str,
+    path: &str,
+    headers: &[(&str, &str)],
+    body: &[u8],
+) -> Result<(u16, String)> {
+    if !["GET", "POST", "PUT", "DELETE"].contains(&method) || path.contains(['\r', '\n', ' ']) {
+        bail!("invalid request");
+    }
     let u = url::Url::parse(base).context("invalid GreptimeDB HTTP address")?;
     if u.scheme() != "http" {
         bail!("the playground only supports http:// GreptimeDB addresses");
@@ -26,7 +40,7 @@ pub async fn post(
         .context("the GreptimeDB HTTP address has no host")?;
     let port = u.port_or_known_default().unwrap_or(80);
     let mut req = format!(
-        "POST {path} HTTP/1.1\r\nHost: {host}:{port}\r\nConnection: close\r\nContent-Length: {}\r\n",
+        "{method} {path} HTTP/1.1\r\nHost: {host}:{port}\r\nConnection: close\r\nContent-Length: {}\r\n",
         body.len()
     );
     for (k, v) in headers {

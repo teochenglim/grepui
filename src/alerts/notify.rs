@@ -112,7 +112,21 @@ pub async fn webhook(url: &str, payload: &Value) -> Result<(), String> {
         "POST {path} HTTP/1.1\r\nHost: {host}:{port}\r\nUser-Agent: grepui\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         body.len()
     );
-    let mut s = connect(&host, port).await?;
+    // Resolve first, refuse blocked addresses, and connect to the address that was checked, so a
+    // name cannot answer differently between the check and the connection.
+    let addrs: Vec<std::net::SocketAddr> =
+        timeout(IO_TIMEOUT, tokio::net::lookup_host((host.as_str(), port)))
+            .await
+            .map_err(|_| format!("resolving {host} timed out"))?
+            .map_err(|e| format!("cannot resolve {host}: {e}"))?
+            .collect();
+    if addrs.is_empty() || addrs.iter().any(|a| super::blocked_ip(a.ip())) {
+        return Err(format!("{host} resolves to an address that is not allowed"));
+    }
+    let mut s = timeout(IO_TIMEOUT, TcpStream::connect(addrs[0]))
+        .await
+        .map_err(|_| format!("connecting to {host}:{port} timed out"))?
+        .map_err(|e| format!("cannot connect to {host}:{port}: {e}"))?;
     timeout(IO_TIMEOUT, s.write_all(req.as_bytes()))
         .await
         .map_err(|_| "sending the webhook timed out".to_string())?

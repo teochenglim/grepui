@@ -10,7 +10,7 @@
 | serde, serde_json, thiserror, anyhow, tracing | Plumbing | 0.1 |
 | sqlparser (visitor) | Validate SQL mode input by AST, find table references (R-L5) | 0.2 |
 | futures-util | Read result rows as a stream so SQL mode stops at the row cap | 0.2 |
-| csv | Enrichment upload (CSV export is hand-written: one fixed schema) | 0.10 |
+| ~~csv~~ | Not adopted in 0.10: `src/csv.rs` (RFC 4180 reader and writer, about 100 lines, tested) serves enrichment uploads and CSV redaction | |
 | rand | View ids (random 64-bit), public link tokens (OS random) | 0.3 |
 | sha2 | SHA-256 of public dashboard link tokens (already in the tree through sqlx) | 0.8 |
 | argon2 | Password hashing, tokens | 0.11 |

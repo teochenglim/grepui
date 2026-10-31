@@ -40,6 +40,8 @@ pub async fn serve(cfg: Config) -> Result<()> {
     }
     let listen = cfg.listen.clone();
     let app = api::AppState::with_parts(cfg, reader.clone(), reader, system_clock())?;
+    // Redaction rules are loaded before the first request is served and kept fresh after.
+    api::redaction::spawn_refresh(app.clone());
     if !app.cfg.no_alerts {
         crate::alerts::engine::spawn(app.clone(), app.sender.clone());
     }

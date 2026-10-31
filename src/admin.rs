@@ -18,6 +18,9 @@ pub const ADMIN_WRITES: &[&str] = &[
     "DROP TABLE (rollup sink)",
     "INSERT INTO rollup sink SELECT (backfill)",
     "ALTER TABLE SET 'ttl' (traces, logs, rollup sink)",
+    "CREATE TABLE (enrichment)",
+    "INSERT INTO enrichment table VALUES",
+    "DROP TABLE (enrichment)",
 ];
 
 /// Rollup templates. Metrics downsampling is a later template (ROADMAP).
@@ -347,6 +350,9 @@ pub fn check(sql: &str, binds: usize, org: &Org) -> Result<(), ApiError> {
             "refusing an admin statement that is not from a template".into(),
         )
     };
+    if crate::enrich::gate(sql, binds, org) {
+        return Ok(());
+    }
     let plan = Plan::for_org(org, "traces_red")?;
     if plan
         .create()

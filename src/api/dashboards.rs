@@ -433,6 +433,7 @@ async fn run_query(
     match q["kind"].as_str() {
         Some("sql") => {
             let (sql, binds) = vars::bind_sql(text, decls, selected)?;
+            let (sql, binds) = super::functions::expand_sql(s, org, &sql, binds).await?;
             let sql = sqlmode::expand_macros(&sql, w.from_ms, w.to_ms);
             sqlmode::check(&sql, &org.database).map_err(|r| ApiError::bad(r.0))?;
             Ok(run_max(

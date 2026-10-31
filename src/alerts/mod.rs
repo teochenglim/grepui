@@ -443,6 +443,12 @@ fn query_check(q: &Query) -> Result<(), ApiError> {
             if q.text.trim().is_empty() || q.text.len() > MAX_QUERY || q.builder.is_some() {
                 return bad("the SQL must be 1-8000 characters");
             }
+            // Saved functions are for SQL mode and panels only; a rule runs its text as written.
+            if crate::functions::expand(&q.text, vec![], &Default::default()).is_err() {
+                return bad(
+                    "saved functions (@name(...)) are only available in SQL mode and dashboard panels",
+                );
+            }
             // The window macros expand to literals; check the statement the way a run would.
             let sql = crate::query::sqlmode::expand_macros(&q.text, 0, 1);
             crate::query::sqlmode::check(&sql, "x_checked_at_run").or_else(|r| {
@@ -582,6 +588,23 @@ pub fn valid_email(a: &str) -> bool {
         && a.matches('@').count() == 1
 }
 
+/// Addresses a webhook may never reach: unspecified, broadcast, multicast and link-local (where
+/// cloud metadata services live), also when an IPv6 address wraps an IPv4 one. Loopback and
+/// private ranges stay allowed: a relay on the local network is the intended target. The check
+/// runs on the literal in the URL and again on every address the host name resolves to.
+pub fn blocked_ip(ip: std::net::IpAddr) -> bool {
+    use std::net::IpAddr::{V4, V6};
+    match ip {
+        V4(v) => v.is_unspecified() || v.is_link_local() || v.is_broadcast() || v.is_multicast(),
+        V6(v) => {
+            v.is_unspecified()
+                || v.is_multicast()
+                || (v.segments()[0] & 0xffc0) == 0xfe80
+                || v.to_ipv4_mapped().is_some_and(|m| blocked_ip(V4(m)))
+        }
+    }
+}
+
 /// A webhook target: plain http, a host, no credentials, not the unspecified or link-local
 /// addresses. (grepui has no TLS; an https endpoint needs a relay on the local network.)
 pub fn webhook_target(raw: &str) -> Result<url::Url, ApiError> {
@@ -597,12 +620,10 @@ pub fn webhook_target(raw: &str) -> Result<url::Url, ApiError> {
     }
     match u.host() {
         None => return bad("the webhook URL has no host"),
-        Some(url::Host::Ipv4(ip))
-            if ip.is_unspecified() || ip.is_link_local() || ip.is_broadcast() =>
-        {
+        Some(url::Host::Ipv4(ip)) if blocked_ip(std::net::IpAddr::V4(ip)) => {
             return bad("that webhook address is not allowed");
         }
-        Some(url::Host::Ipv6(ip)) if ip.is_unspecified() => {
+        Some(url::Host::Ipv6(ip)) if blocked_ip(std::net::IpAddr::V6(ip)) => {
             return bad("that webhook address is not allowed");
         }
         _ => {}

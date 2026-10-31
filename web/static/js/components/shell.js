@@ -20,11 +20,14 @@ const LIVE = [
   ['streams', 'Streams'],
   ['health', 'Data health'],
   ['rollups', 'Rollups'],
+  ['pipelines', 'Pipelines'],
+  ['functions', 'Functions'],
+  ['enrichment', 'Enrichment'],
+  ['redaction', 'Redaction'],
   ['retention', 'Retention'],
   ['connect', 'Connect'],
 ];
 const SOON = [
-  ['Pipelines', 'v0.10'],
   ['Access control', 'v0.11'],
 ];
 

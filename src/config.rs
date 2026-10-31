@@ -53,6 +53,9 @@ pub struct Config {
         default_value = "grepui@localhost.localdomain"
     )]
     pub smtp_from: String,
+    /// GreptimeDB HTTP address grepui itself calls for pipelines (default: --greptime-http-public).
+    #[arg(long, env = "GREPUI_PIPELINE_HTTP")]
+    pub pipeline_http: Option<String>,
     /// Per-query timeout in seconds.
     #[arg(long, env = "GREPUI_QUERY_TIMEOUT_SECS", default_value_t = 30)]
     pub query_timeout_secs: u64,
@@ -69,6 +72,7 @@ impl Default for Config {
             meta_database: "grepui".into(),
             admin_writes: false,
             no_alerts: false,
+            pipeline_http: None,
             smtp: None,
             smtp_from: "grepui@localhost.localdomain".into(),
             query_timeout_secs: 30,

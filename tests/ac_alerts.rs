@@ -862,6 +862,10 @@ async fn ac_0_9_4_destination_rules() {
         "http://user:pw@example.com/",
         "http://169.254.169.254/latest/meta-data",
         "http://0.0.0.0/",
+        "http://[fe80::1]/",
+        "http://[::ffff:169.254.169.254]/",
+        "http://[::]/",
+        "http://224.0.0.1/",
         "file:///etc/passwd",
         "not a url",
     ] {
@@ -1805,4 +1809,23 @@ fn ac_0_9_1_demo_alert_is_valid() {
     let v: Value = serde_json::from_str(grepui::playground::DEMO_ALERT).unwrap();
     let r = alerts::parse_rule(&v).unwrap();
     assert_eq!(r.dedup.fields, vec!["service_name"]);
+}
+
+#[tokio::test]
+async fn ac_0_9_4_webhook_blocks_names_that_resolve_to_blocked_addresses() {
+    // A name is checked after it is resolved: this one is not a literal, yet maps to 0.0.0.0.
+    let e = notify::webhook("http://0.0.0.0.nip.invalid/x", &json!({}))
+        .await
+        .unwrap_err();
+    assert!(
+        e.contains("cannot resolve") || e.contains("not allowed"),
+        "{e}"
+    );
+    assert!(alerts::blocked_ip("169.254.169.254".parse().unwrap()));
+    assert!(alerts::blocked_ip(
+        "::ffff:169.254.169.254".parse().unwrap()
+    ));
+    assert!(alerts::blocked_ip("fe80::1".parse().unwrap()));
+    assert!(!alerts::blocked_ip("127.0.0.1".parse().unwrap()));
+    assert!(!alerts::blocked_ip("10.1.2.3".parse().unwrap()));
 }

@@ -28,9 +28,12 @@ pub async fn run(
 ) -> Result<Response, ApiError> {
     let w = Window::parse(p.from, p.to, p.limit)?;
     let org = s.org(&org)?;
-    let sql = sqlmode::expand_macros(p.sql.as_deref().unwrap_or_default(), w.from_ms, w.to_ms);
+    // Saved functions expand here (SQL mode and panels only); their arguments become binds.
+    let (sql, binds) =
+        super::functions::expand_sql(&s, org, p.sql.as_deref().unwrap_or_default(), vec![]).await?;
+    let sql = sqlmode::expand_macros(&sql, w.from_ms, w.to_ms);
     sqlmode::check(&sql, &org.database).map_err(|r| ApiError::bad(r.0))?;
-    let q = Q::new("sql_mode", &sql, vec![]);
+    let q = Q::new("sql_mode", &sql, binds);
     let (rows, meta) = run_max(s.reader.as_ref(), q, w.limit as usize).await?;
     let columns: Vec<String> = rows
         .first()

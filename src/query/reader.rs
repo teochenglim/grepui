@@ -88,6 +88,8 @@ fn bind_all<'q>(q: &'q Q) -> sqlx::query::Query<'q, sqlx::MySql, sqlx::mysql::My
             Bind::Str(s) => query.bind(s.clone()),
             Bind::Int(i) => query.bind(*i),
             Bind::Bool(b) => query.bind(*b),
+            Bind::Float(f) => query.bind(*f),
+            Bind::Null => query.bind(Option::<String>::None),
         };
     }
     query

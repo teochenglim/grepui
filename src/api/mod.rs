@@ -3,10 +3,14 @@
 pub mod alerts;
 pub mod connect;
 pub mod dashboards;
+pub mod enrichment;
+pub mod functions;
 pub mod health;
 pub mod ingest;
 pub mod logs;
 pub mod metrics;
+pub mod pipelines;
+pub mod redaction;
 pub mod services;
 pub mod sql;
 pub mod storage;
@@ -30,7 +34,7 @@ use axum::{
 };
 use serde::Serialize;
 use serde_json::{Value, json};
-use std::{sync::Arc, time::Instant};
+use std::{collections::HashMap, sync::Arc, time::Instant};
 
 pub struct AppState {
     pub cfg: Arc<Config>,
@@ -46,6 +50,10 @@ pub struct AppState {
     pub cols_cache: ColsCache,
     /// Delivers alert notifications (webhook, SMTP); a fake in tests.
     pub sender: Arc<dyn crate::alerts::notify::Sender>,
+    /// Redaction rules per org, kept in memory so no response waits on a read (ADR 0011).
+    pub redact: std::sync::RwLock<HashMap<String, Arc<crate::redact::Rules>>>,
+    /// `false` until the first load at startup: data responses wait rather than leak.
+    pub redact_ready: std::sync::atomic::AtomicBool,
 }
 
 pub type Shared = Arc<AppState>;
@@ -114,6 +122,8 @@ impl AppState {
             ft_cache: Default::default(),
             cols_cache: Default::default(),
             sender,
+            redact: Default::default(),
+            redact_ready: std::sync::atomic::AtomicBool::new(true),
         }))
     }
 
@@ -152,7 +162,7 @@ impl AppState {
             .map_err(store_error)
     }
 
-    fn admin_enabled(&self) -> Result<(), ApiError> {
+    pub fn admin_enabled(&self) -> Result<(), ApiError> {
         if self.cfg.admin_writes {
             Ok(())
         } else {
@@ -195,7 +205,12 @@ impl AppState {
             .strip_prefix(&format!("/* q:{} */ ", q.name))
             .unwrap_or_default();
         crate::admin::check(body, q.binds.len(), org)?;
-        tracing::info!(target: "audit", org = %org.name, actor = crate::store::LOCAL_USER, action = q.name, binds = ?q.binds, "admin write");
+        // Uploaded cells are data, not audit material: log how many values, not which.
+        if q.name == "enrich_insert" {
+            tracing::info!(target: "audit", org = %org.name, actor = crate::store::LOCAL_USER, action = q.name, binds = q.binds.len(), "admin write");
+        } else {
+            tracing::info!(target: "audit", org = %org.name, actor = crate::store::LOCAL_USER, action = q.name, binds = ?q.binds, "admin write");
+        }
         let t = Instant::now();
         let n = self.writer.exec(&q).await.map_err(store_error)?;
         Ok(Meta {
@@ -207,6 +222,48 @@ impl AppState {
             source: "raw",
             note: None,
         })
+    }
+
+    /// One call to GreptimeDB's pipeline API. `write` calls need `--admin-writes`, may only touch
+    /// this org's pipelines (`pipelines::check_path`) and are logged.
+    pub async fn pipeline_call(
+        &self,
+        org: &Org,
+        action: &'static str,
+        method: &str,
+        path: &str,
+        body: Option<(&str, Vec<u8>)>,
+        write: bool,
+    ) -> Result<(u16, String), ApiError> {
+        if write {
+            self.admin_enabled()?;
+            tracing::info!(target: "audit", org = %org.name, actor = crate::store::LOCAL_USER, action, %path, "admin write");
+        }
+        if !crate::pipelines::check_path(&org.name, path) {
+            tracing::error!(%path, "blocked a pipeline call");
+            return Err(ApiError(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal error".into(),
+            ));
+        }
+        let base = self
+            .cfg
+            .pipeline_http
+            .clone()
+            .unwrap_or_else(|| self.cfg.greptime_http_public.clone());
+        let (headers, bytes) = match &body {
+            Some((ct, b)) => (vec![("content-type", *ct)], b.as_slice()),
+            None => (vec![], &[][..]),
+        };
+        crate::http::request(method, &base, path, &headers, bytes)
+            .await
+            .map_err(|e| {
+                tracing::warn!(error = %e, "pipeline API call failed");
+                ApiError(
+                    StatusCode::BAD_GATEWAY,
+                    "cannot reach GreptimeDB's HTTP API (see --pipeline-http)".into(),
+                )
+            })
     }
 
     pub fn org(&self, name: &str) -> Result<&Org, ApiError> {
@@ -305,6 +362,16 @@ pub const ROUTES: &[&str] = &[
     "/api/v1/orgs/{org}/incidents/{id}",
     "/api/v1/orgs/{org}/incidents/{id}/ack",
     "/api/v1/orgs/{org}/incidents/{id}/resolve",
+    "/api/v1/orgs/{org}/pipelines",
+    "/api/v1/orgs/{org}/pipelines/dry-run",
+    "/api/v1/orgs/{org}/pipelines/{name}",
+    "/api/v1/orgs/{org}/functions",
+    "/api/v1/orgs/{org}/functions/{name}",
+    "/api/v1/orgs/{org}/enrichment",
+    "/api/v1/orgs/{org}/enrichment/{name}",
+    "/api/v1/orgs/{org}/enrichment/{name}/join",
+    "/api/v1/orgs/{org}/redaction",
+    "/api/v1/orgs/{org}/redaction/{id}",
     "/api/v1/orgs/{org}/metrics",
     "/api/v1/orgs/{org}/metrics/query",
     "/api/v1/orgs/{org}/metrics/{name}/labels",
@@ -359,6 +426,16 @@ pub const WRITE_ROUTES: &[(&str, &str)] = &[
     ("DELETE", "/api/v1/orgs/{org}/downtimes/{id}"),
     ("POST", "/api/v1/orgs/{org}/incidents/{id}/ack"),
     ("POST", "/api/v1/orgs/{org}/incidents/{id}/resolve"),
+    ("POST", "/api/v1/orgs/{org}/pipelines/dry-run"),
+    ("PUT", "/api/v1/orgs/{org}/pipelines/{name}"),
+    ("DELETE", "/api/v1/orgs/{org}/pipelines/{name}"),
+    ("PUT", "/api/v1/orgs/{org}/functions/{name}"),
+    ("DELETE", "/api/v1/orgs/{org}/functions/{name}"),
+    ("POST", "/api/v1/orgs/{org}/enrichment/{name}"),
+    ("DELETE", "/api/v1/orgs/{org}/enrichment/{name}"),
+    ("POST", "/api/v1/orgs/{org}/redaction"),
+    ("PUT", "/api/v1/orgs/{org}/redaction/{id}"),
+    ("DELETE", "/api/v1/orgs/{org}/redaction/{id}"),
     ("PUT", "/api/v1/orgs/{org}/services/{service}/annotation"),
     ("DELETE", "/api/v1/orgs/{org}/services/{service}/annotation"),
 ];
@@ -580,6 +657,42 @@ pub fn router(state: Shared) -> Router {
             "/api/v1/orgs/{org}/incidents/{id}/resolve",
             axum::routing::post(alerts::incident_resolve),
         )
+        .route("/api/v1/orgs/{org}/pipelines", get(pipelines::list))
+        .route(
+            "/api/v1/orgs/{org}/pipelines/dry-run",
+            axum::routing::post(pipelines::dry_run),
+        )
+        .route(
+            "/api/v1/orgs/{org}/pipelines/{name}",
+            get(pipelines::get)
+                .put(pipelines::put)
+                .delete(pipelines::delete),
+        )
+        .route("/api/v1/orgs/{org}/functions", get(functions::list))
+        .route(
+            "/api/v1/orgs/{org}/functions/{name}",
+            axum::routing::put(functions::put).delete(functions::delete),
+        )
+        .route("/api/v1/orgs/{org}/enrichment", get(enrichment::list))
+        .route(
+            "/api/v1/orgs/{org}/enrichment/{name}",
+            get(enrichment::get)
+                .post(enrichment::upload)
+                .delete(enrichment::drop)
+                .layer(enrichment::upload_limit()),
+        )
+        .route(
+            "/api/v1/orgs/{org}/enrichment/{name}/join",
+            get(enrichment::join),
+        )
+        .route(
+            "/api/v1/orgs/{org}/redaction",
+            get(redaction::list).post(redaction::create),
+        )
+        .route(
+            "/api/v1/orgs/{org}/redaction/{id}",
+            axum::routing::put(redaction::update).delete(redaction::delete),
+        )
         .route("/api/v1/orgs/{org}/metrics", get(metrics::names))
         .route("/api/v1/orgs/{org}/metrics/query", get(metrics::query))
         .route(
@@ -613,6 +726,11 @@ pub fn router(state: Shared) -> Router {
         .route("/api/v1/orgs/{org}/logs/around", get(logs::around))
         .route("/api/v1/orgs/{org}/logs/export", get(logs::export))
         .route("/api/v1/orgs/{org}/sql", get(sql::run))
+        // A route layer runs after the route is matched, so the layer can read the template.
+        .route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            redaction::layer,
+        ))
         .fallback(fallback)
         .layer(axum::extract::DefaultBodyLimit::max(MAX_BODY))
         .with_state(state)

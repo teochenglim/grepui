@@ -6,7 +6,7 @@
 //! given, only against a database named `demo` or `demo_*`, and only when that database has
 //! no traces yet (append-mode tables reject DELETE, so a re-seed would double every count).
 
-pub mod http;
+pub use crate::http;
 pub mod proto;
 pub mod synth;
 
@@ -213,6 +213,37 @@ pub async fn seed_demo_alert(reader: &SqlxReader, meta_db: &str, org: &str) -> R
     Ok(())
 }
 
+/// A saved function for the playground: spans slower than a number of milliseconds.
+pub const DEMO_FUNCTION: &str = r#"{"name": "slower_than", "description": "Spans slower than the given milliseconds", "params": ["ms"], "body": "((CAST(`timestamp_end` AS BIGINT) - CAST(`timestamp` AS BIGINT)) / 1000000 > $1)"}"#;
+
+/// Create the demo function if the org has none. State-store writes only.
+pub async fn seed_demo_function(reader: &SqlxReader, meta_db: &str, org: &str) -> Result<()> {
+    use crate::store::{build, check_write};
+    let (rows, _) = crate::query::run(reader, build::item_list(meta_db, org, "function")?).await?;
+    if !rows.is_empty() {
+        return Ok(());
+    }
+    let f = serde_json::from_str::<crate::functions::Function>(DEMO_FUNCTION)?
+        .canonical()
+        .map_err(|e| anyhow::anyhow!("demo function: {}", e.1))?;
+    let now = (now_ns() / 1_000_000) as i64;
+    let row = build::ItemRow {
+        item_id: f.name.clone(),
+        name: f.name.clone(),
+        spec: serde_json::to_string(&f)?,
+        owner: crate::store::LOCAL_USER.into(),
+        created_ms: now,
+        updated_ms: now,
+        deleted: false,
+    };
+    let q = build::item_put(meta_db, org, "function", &row)?;
+    check_write(&q, meta_db)?;
+    crate::query::Writer::exec(reader, &q)
+        .await
+        .map_err(|e| anyhow::anyhow!("could not create the demo function: {}", e.detail()))?;
+    Ok(())
+}
+
 /// Everything before serving: wait, guard, seed, start the live trickle.
 pub async fn prepare(cfg: &Config, o: &Opts) -> Result<()> {
     cfg.validate()?;
@@ -236,6 +267,11 @@ pub async fn prepare(cfg: &Config, o: &Opts) -> Result<()> {
         seed_demo_alert(reader.as_ref(), &cfg.meta_database, crate::org::DEFAULT_ORG).await
     {
         tracing::warn!(error = %e, "playground: no demo alert");
+    }
+    if let Err(e) =
+        seed_demo_function(reader.as_ref(), &cfg.meta_database, crate::org::DEFAULT_ORG).await
+    {
+        tracing::warn!(error = %e, "playground: no demo function");
     }
     let db = cfg.database()?;
     let present = has_traces(reader.as_ref(), &db, &cfg.traces_table).await;

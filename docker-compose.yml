@@ -20,6 +20,8 @@ services:
       GREPTIME_HTTP: http://greptimedb:4000
       # The address collectors on the host use; shown on the Connect page.
       GREPTIME_HTTP_PUBLIC: http://127.0.0.1:4000
+      # Where grepui calls GreptimeDB's pipeline API (compose-internal).
+      GREPUI_PIPELINE_HTTP: http://greptimedb:4000
     ports: ["127.0.0.1:8080:8080"]
     depends_on: [greptimedb]
 

@@ -43,6 +43,9 @@ pub enum Bind {
     Str(String),
     Int(i64),
     Bool(bool),
+    Float(f64),
+    /// SQL NULL (enrichment uploads).
+    Null,
 }
 
 impl Bind {
@@ -51,6 +54,8 @@ impl Bind {
             Bind::Str(s) => s.clone(),
             Bind::Int(i) => i.to_string(),
             Bind::Bool(b) => b.to_string(),
+            Bind::Float(f) => f.to_string(),
+            Bind::Null => "NULL".to_string(),
         }
     }
 }

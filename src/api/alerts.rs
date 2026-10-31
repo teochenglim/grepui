@@ -767,3 +767,21 @@ pub async fn info(State(s): State<Shared>, Path(org): Path<String>) -> Result<Re
         static_meta("alerts_info"),
     ))
 }
+
+// Shared by the other small-config APIs (functions, redaction): the same kind-tagged store.
+pub async fn engine_items(s: &Shared, org: &Org, kind: &str) -> Result<Vec<ItemRow>, ApiError> {
+    engine::items(s, org, kind).await
+}
+
+pub async fn engine_item(
+    s: &Shared,
+    org: &Org,
+    kind: &str,
+    id: &str,
+) -> Result<Option<ItemRow>, ApiError> {
+    engine::item(s, org, kind, id).await
+}
+
+pub async fn engine_save(s: &Shared, org: &Org, kind: &str, r: &ItemRow) -> Result<Meta, ApiError> {
+    engine::save(s, org, kind, r).await
+}

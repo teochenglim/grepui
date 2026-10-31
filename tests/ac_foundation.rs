@@ -308,7 +308,10 @@ async fn ac_0_1_4_every_listed_route_exists() {
             || route.ends_with("/resolve")
             || route.ends_with("/destinations")
             || route.ends_with("/destinations/{id}")
-            || route.ends_with("/downtimes/{id}");
+            || route.ends_with("/downtimes/{id}")
+            || route.ends_with("/dry-run")
+            || route.ends_with("/functions/{name}")
+            || route.ends_with("/redaction/{id}");
         if !write_only {
             assert_ne!(r.status, StatusCode::METHOD_NOT_ALLOWED, "{route}");
         }
