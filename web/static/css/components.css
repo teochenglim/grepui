@@ -69,10 +69,10 @@ td.cell-json, td.cell-long { max-width: 420px; overflow: hidden; text-overflow: 
 .split { display: flex; gap: var(--gap); align-items: flex-start; min-width: 0; }
 .fieldbox { width: 260px; flex: none; max-height: 70vh; overflow: auto; padding: 12px; }
 .fields { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
-.field { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 3px 4px; border-radius: 4px; }
-.field.clickable { cursor: pointer; } .field.clickable:hover { background: var(--surface-2); }
+.frow { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 3px 4px; border-radius: 4px; }
+.frow.clickable { cursor: pointer; } .frow.clickable:hover { background: var(--surface-2); }
 .fname { font-family: var(--mono); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; }
-.field-wrap input { width: 100%; margin: 2px 0; font-size: 12px; padding: 3px 6px; }
+.frow-wrap input { width: 100%; margin: 2px 0; font-size: 12px; padding: 3px 6px; }
 .values { display: flex; flex-direction: column; gap: 3px; padding: 2px 0 6px 10px; }
 .chip { display: flex; justify-content: space-between; gap: 8px; text-align: left; padding: 2px 8px; font-size: 12px; }
 .err { color: var(--bad); font-size: 12px; }
@@ -87,3 +87,13 @@ table.logs.compact td { padding: 4px 10px; } table.logs tr.pivot td { background
 .sqlbox { width: 100%; font-family: var(--mono); font-size: 13px; resize: vertical; }
 .sqlmode { display: flex; flex-direction: column; gap: 10px; }
 @media (max-width: 900px) { .split { flex-direction: column; } .fieldbox { width: 100%; max-height: none; } }
+
+/* Views, history, details, health */
+.menu { position: relative; }
+.menu > summary { cursor: pointer; list-style: none; padding: 5px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); user-select: none; }
+.menu > summary:hover, .menu[open] > summary { border-color: var(--accent); }
+.menu-body { position: absolute; right: 0; z-index: 10; min-width: 340px; max-width: min(520px, 90vw); max-height: 60vh; overflow: auto; margin-top: 4px; padding: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 12px 28px rgba(0,0,0,.25); display: flex; flex-direction: column; gap: 4px; }
+.menu-row { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 4px; } .menu-row:hover { background: var(--surface-2); }
+button.icon { padding: 1px 6px; border: 0; font-size: 13px; }
+.clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.grid2 { display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }

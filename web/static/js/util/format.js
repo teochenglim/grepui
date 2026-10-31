@@ -24,3 +24,19 @@ export function fmtCell(v) {
   if (typeof v === 'object') return JSON.stringify(v);
   return String(v);
 }
+
+export function fmtBytes(n) {
+  if (n == null || Number.isNaN(Number(n))) return '–';
+  const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let v = Number(n), i = 0;
+  while (v >= 1024 && i < u.length - 1) (v /= 1024), i++;
+  return `${v >= 10 || i === 0 ? Math.round(v) : v.toFixed(1)} ${u[i]}`;
+}
+
+export function fmtDuration(secs) {
+  if (secs == null) return '–';
+  if (secs < 60) return `${secs}s`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`;
+  return `${Math.floor(secs / 86400)}d`;
+}

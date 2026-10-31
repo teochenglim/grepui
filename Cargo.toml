@@ -1,6 +1,6 @@
 [package]
 name = "grepui"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/teochenglim/grepui"
@@ -15,6 +15,7 @@ clap = { version = "4", features = ["derive", "env"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154", features = ["preserve_order"] }
 futures-util = { version = "0.3", default-features = false }
+rand = "0.8"
 sqlparser = { version = "0.63.0", features = ["visitor"] }
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "mysql", "chrono", "bigdecimal", "json"] }
 thiserror = "2.0.21"

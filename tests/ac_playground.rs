@@ -2,8 +2,9 @@
 //! and no ingest path in `serve`.
 mod common;
 use common::*;
+use grepui::config::admin_url;
 use grepui::playground::{
-    admin_url, has_traces, is_demo_database, plan_seed, proto,
+    has_traces, is_demo_database, plan_seed, proto,
     synth::{self, Batch},
 };
 use serde_json::json;

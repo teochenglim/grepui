@@ -1,6 +1,6 @@
 //! `SqlxReader`: runs a [`Q`] over the MySQL protocol and returns JSON rows.
 
-use super::{Bind, Q, Reader};
+use super::{Bind, Q, Reader, Writer};
 use crate::error::ReadError;
 use async_trait::async_trait;
 use futures_util::StreamExt;
@@ -87,6 +87,7 @@ fn bind_all<'q>(q: &'q Q) -> sqlx::query::Query<'q, sqlx::MySql, sqlx::mysql::My
         query = match b {
             Bind::Str(s) => query.bind(s.clone()),
             Bind::Int(i) => query.bind(*i),
+            Bind::Bool(b) => query.bind(*b),
         };
     }
     query
@@ -118,5 +119,29 @@ impl Reader for SqlxReader {
             .map_err(|_| ReadError::Timeout)?
             .map_err(|e| ReadError::Db(e.to_string()))?;
         Ok(rows.iter().map(row_to_json).collect())
+    }
+}
+
+#[async_trait]
+impl Writer for SqlxReader {
+    async fn exec(&self, q: &Q) -> Result<u64, ReadError> {
+        // The caller (`AppState::write`) has already passed `store::check_write`.
+        let done = tokio::time::timeout(self.timeout, bind_all(q).execute(&self.pool))
+            .await
+            .map_err(|_| ReadError::Timeout)?
+            .map_err(|e| ReadError::Db(e.to_string()))?;
+        Ok(done.rows_affected())
+    }
+
+    async fn ddl(&self, sql: &str) -> Result<(), ReadError> {
+        // `sql` is one of the fixed statements from `store::migration_statements`.
+        tokio::time::timeout(
+            self.timeout,
+            sqlx::raw_sql(sqlx::AssertSqlSafe(sql.to_string())).execute(&self.pool),
+        )
+        .await
+        .map_err(|_| ReadError::Timeout)?
+        .map_err(|e| ReadError::Db(e.to_string()))?;
+        Ok(())
     }
 }

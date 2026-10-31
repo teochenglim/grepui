@@ -2,15 +2,17 @@
 
 pub mod connect;
 pub mod health;
+pub mod ingest;
 pub mod logs;
 pub mod sql;
 pub mod streams;
+pub mod views;
 
 use crate::{
     config::Config,
     error::ApiError,
     org::{Org, Orgs},
-    query::{self, Meta, Q, Reader},
+    query::{self, Meta, Q, Reader, Writer},
     ui,
 };
 use axum::{
@@ -22,28 +24,106 @@ use axum::{
 };
 use serde::Serialize;
 use serde_json::{Value, json};
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 pub struct AppState {
     pub cfg: Arc<Config>,
     pub orgs: Orgs,
     pub reader: Arc<dyn Reader>,
+    /// The only way grepui writes (its own metadata tables); see `store::check_write`.
+    pub writer: Arc<dyn Writer>,
+    /// Milliseconds since the epoch; injectable so tests control time.
+    pub clock: Clock,
     /// Whether each org's logs table has a fulltext index on `body` (R-L6), cached briefly.
     pub ft_cache: std::sync::Mutex<std::collections::HashMap<String, (std::time::Instant, bool)>>,
 }
 
 pub type Shared = Arc<AppState>;
+pub type Clock = Arc<dyn Fn() -> i64 + Send + Sync>;
+
+pub fn system_clock() -> Clock {
+    Arc::new(|| {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as i64)
+            .unwrap_or(0)
+    })
+}
+
+/// A writer that refuses everything: used when no state store is configured (tests, read-only runs).
+pub struct NoWriter;
+
+#[async_trait::async_trait]
+impl Writer for NoWriter {
+    async fn exec(&self, _q: &Q) -> Result<u64, crate::error::ReadError> {
+        Err(crate::error::ReadError::Db(
+            "the state store is not configured".into(),
+        ))
+    }
+    async fn ddl(&self, _sql: &str) -> Result<(), crate::error::ReadError> {
+        Err(crate::error::ReadError::Db(
+            "the state store is not configured".into(),
+        ))
+    }
+}
 
 impl AppState {
+    /// Read-only state: the store refuses writes (`NoWriter`) and time is the system clock.
     pub fn new(cfg: Config, reader: Arc<dyn Reader>) -> anyhow::Result<Shared> {
+        Self::with_parts(cfg, reader, Arc::new(NoWriter), system_clock())
+    }
+
+    pub fn with_parts(
+        cfg: Config,
+        reader: Arc<dyn Reader>,
+        writer: Arc<dyn Writer>,
+        clock: Clock,
+    ) -> anyhow::Result<Shared> {
         cfg.validate()?;
         let orgs = Orgs::from_config(&cfg)?;
         Ok(Arc::new(AppState {
             cfg: Arc::new(cfg),
             orgs,
             reader,
+            writer,
+            clock,
             ft_cache: Default::default(),
         }))
+    }
+
+    pub fn now_ms(&self) -> i64 {
+        (self.clock)()
+    }
+
+    /// The metadata database name (validated at startup).
+    pub fn meta_db(&self) -> &str {
+        &self.cfg.meta_database
+    }
+
+    /// The only write path: gate, execute, report like a read ("Show SQL" works for writes too).
+    pub async fn write(&self, q: Q) -> Result<Meta, ApiError> {
+        crate::store::check_write(&q, self.meta_db()).map_err(|e| {
+            tracing::error!(error = %e, query = q.name, "blocked a write");
+            ApiError(StatusCode::INTERNAL_SERVER_ERROR, "internal error".into())
+        })?;
+        let t = Instant::now();
+        let n = self.writer.exec(&q).await.map_err(store_error)?;
+        Ok(Meta {
+            query: q.name.to_string(),
+            sql: q.sql.clone(),
+            binds: q.binds.iter().map(query::Bind::show).collect(),
+            ms: t.elapsed().as_millis() as u64,
+            rows: n as usize,
+            source: "raw",
+            note: None,
+        })
+    }
+
+    /// Read a metadata table; a missing table means "run `grepui migrate`".
+    pub async fn read_store(&self, q: Q) -> Result<(Vec<Value>, Meta), ApiError> {
+        query::run(self.reader.as_ref(), q)
+            .await
+            .map_err(store_error)
     }
 
     pub fn org(&self, name: &str) -> Result<&Org, ApiError> {
@@ -78,7 +158,15 @@ pub const ROUTES: &[&str] = &[
     "/api/v1/orgs/{org}/streams/{name}",
     "/api/v1/orgs/{org}/streams/{name}/stats",
     "/api/v1/orgs/{org}/streams/{name}/sample",
+    "/api/v1/orgs/{org}/streams/{name}/info",
+    "/api/v1/orgs/{org}/streams/{name}/ddl",
     "/api/v1/orgs/{org}/connect",
+    "/api/v1/orgs/{org}/ingest/freshness",
+    "/api/v1/orgs/{org}/ingest/rate",
+    "/api/v1/orgs/{org}/ingest/services",
+    "/api/v1/orgs/{org}/views",
+    "/api/v1/orgs/{org}/views/{id}",
+    "/api/v1/orgs/{org}/history",
     "/api/v1/orgs/{org}/logs",
     "/api/v1/orgs/{org}/logs/histogram",
     "/api/v1/orgs/{org}/logs/fields",
@@ -88,6 +176,18 @@ pub const ROUTES: &[&str] = &[
     "/api/v1/orgs/{org}/logs/export",
     "/api/v1/orgs/{org}/sql",
 ];
+
+/// The only routes that change state, with their methods. Every other route is GET-only. Each
+/// writes through `AppState::write`, which allows nothing but the `grepui_*` tables (R-F4).
+pub const WRITE_ROUTES: &[(&str, &str)] = &[
+    ("POST", "/api/v1/orgs/{org}/views"),
+    ("PUT", "/api/v1/orgs/{org}/views/{id}"),
+    ("DELETE", "/api/v1/orgs/{org}/views/{id}"),
+    ("POST", "/api/v1/orgs/{org}/history"),
+];
+
+/// Largest request body any route accepts.
+pub const MAX_BODY: usize = 64 * 1024;
 
 pub fn router(state: Shared) -> Router {
     Router::new()
@@ -105,7 +205,27 @@ pub fn router(state: Shared) -> Router {
             "/api/v1/orgs/{org}/streams/{name}/sample",
             get(streams::sample),
         )
+        .route("/api/v1/orgs/{org}/streams/{name}/info", get(streams::info))
+        .route("/api/v1/orgs/{org}/streams/{name}/ddl", get(streams::ddl))
         .route("/api/v1/orgs/{org}/connect", get(connect::get))
+        .route(
+            "/api/v1/orgs/{org}/ingest/freshness",
+            get(ingest::freshness),
+        )
+        .route("/api/v1/orgs/{org}/ingest/rate", get(ingest::rate))
+        .route("/api/v1/orgs/{org}/ingest/services", get(ingest::services))
+        .route(
+            "/api/v1/orgs/{org}/views",
+            get(views::list).post(views::create),
+        )
+        .route(
+            "/api/v1/orgs/{org}/views/{id}",
+            get(views::get).put(views::update).delete(views::delete),
+        )
+        .route(
+            "/api/v1/orgs/{org}/history",
+            get(views::history).post(views::record),
+        )
         .route("/api/v1/orgs/{org}/logs", get(logs::search))
         .route("/api/v1/orgs/{org}/logs/histogram", get(logs::histogram))
         .route("/api/v1/orgs/{org}/logs/fields", get(logs::fields))
@@ -118,6 +238,7 @@ pub fn router(state: Shared) -> Router {
         .route("/api/v1/orgs/{org}/logs/export", get(logs::export))
         .route("/api/v1/orgs/{org}/sql", get(sql::run))
         .fallback(fallback)
+        .layer(axum::extract::DefaultBodyLimit::max(MAX_BODY))
         .with_state(state)
 }
 
@@ -150,4 +271,17 @@ async fn fallback(method: Method, uri: Uri, headers: HeaderMap) -> Response {
             .get(header::IF_NONE_MATCH)
             .and_then(|v| v.to_str().ok()),
     )
+}
+
+/// Map a metadata failure: a missing table or database is a 503 with the fix, not a 502.
+pub fn store_error(e: crate::error::ReadError) -> ApiError {
+    if let crate::error::ReadError::Db(d) = &e
+        && (crate::store::is_missing(d) || d.contains("not configured"))
+    {
+        return ApiError(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "the state store is not initialised: run `grepui migrate`".into(),
+        );
+    }
+    e.into()
 }

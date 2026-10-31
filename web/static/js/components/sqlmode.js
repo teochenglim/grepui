@@ -33,6 +33,6 @@ export function sqlMode({ sql, onChange }) {
   run.addEventListener('click', exec);
   area.addEventListener('keydown', (e) => e.key === 'Enter' && (e.ctrlKey || e.metaKey) && (e.preventDefault(), exec()));
   return h('div', { class: 'sqlmode' },
-    h('p', { class: 'muted' }, 'One SELECT, WITH, SHOW, DESC, EXPLAIN or TQL statement, inside this org\'s database. ', h('code', null, '$__from'), ' and ', h('code', null, '$__to'), ' become the selected time range.'),
+    h('p', { class: 'muted' }, 'One SELECT, WITH, SHOW, DESC or EXPLAIN statement, inside this org\'s database (PromQL arrives with Metrics). ', h('code', null, '$__from'), ' and ', h('code', null, '$__to'), ' become the selected time range.'),
     area, h('div', { class: 'row' }, run), out);
 }

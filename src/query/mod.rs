@@ -21,14 +21,15 @@ pub const MAX_WINDOW_MS: i64 = 31 * DAY_MS;
 pub const DEFAULT_LIMIT: u32 = 100;
 pub const MAX_LIMIT: u32 = 1000;
 
-/// Every table grepui may write to or run DDL against. Empty until the metadata store
-/// (v0.3.0); a test pins the contents (R-F4, ADR 0004).
-pub const WRITE_TARGETS: &[&str] = &[];
+/// Every table grepui may write to or run DDL against: its own metadata tables, in the
+/// metadata database (v0.3.0). A test pins the contents (R-F4, ADR 0004).
+pub const WRITE_TARGETS: &[&str] = &["grepui_schema", "grepui_views", "grepui_history"];
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Bind {
     Str(String),
     Int(i64),
+    Bool(bool),
 }
 
 impl Bind {
@@ -36,6 +37,7 @@ impl Bind {
         match self {
             Bind::Str(s) => s.clone(),
             Bind::Int(i) => i.to_string(),
+            Bind::Bool(b) => b.to_string(),
         }
     }
 }
@@ -70,6 +72,16 @@ pub trait Reader: Send + Sync {
         rows.truncate(max);
         Ok(rows)
     }
+}
+
+/// Writes. Only `crate::store` builds the statements and only [`crate::store::check_write`]
+/// lets one through (R-F4): grepui's own metadata tables, nothing else.
+#[async_trait]
+pub trait Writer: Send + Sync {
+    /// Execute one `INSERT` built by the store; returns the affected row count.
+    async fn exec(&self, q: &Q) -> Result<u64, ReadError>;
+    /// Run one fixed migration statement (text protocol; DDL cannot be prepared).
+    async fn ddl(&self, sql: &str) -> Result<(), ReadError>;
 }
 
 /// "Show SQL" (R-Q4): what ran, how long it took, how many rows, and where the data came from.
@@ -188,4 +200,18 @@ pub fn ts_string(ms: i64) -> String {
         .unwrap_or_default()
         .format("%Y-%m-%d %H:%M:%S%.3f")
         .to_string()
+}
+
+/// Block until the database answers, retrying for up to `secs` (compose and CI start it late).
+pub async fn wait_for_db(reader: &dyn Reader, secs: u64) -> anyhow::Result<()> {
+    let deadline = Instant::now() + std::time::Duration::from_secs(secs);
+    loop {
+        match reader.fetch(&build::health()).await {
+            Ok(_) => return Ok(()),
+            Err(e) if Instant::now() >= deadline => {
+                anyhow::bail!("GreptimeDB is not reachable after {secs}s: {}", e.detail())
+            }
+            Err(_) => tokio::time::sleep(std::time::Duration::from_secs(2)).await,
+        }
+    }
 }

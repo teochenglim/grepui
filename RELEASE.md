@@ -2,7 +2,7 @@
 
 The single place to see where grepui stands: what is shipped, what is planned, what each release proves, and how a release is cut. Per-release detail (scope, acceptance criteria, named tests, checklist) lives in [`RELEASE/vX.Y.Z.md`](RELEASE/README.md); this file is the readable roll-up and the changelog.
 
-> **Current state:** v0.1.0 and v0.2.0 are **ready** (code, tests and docs done; the commits, tags and releases are the owner's step). No tag has been pushed, so nothing is published. v0.3.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
+> **Current state:** v0.1.0 to v0.3.0 are **ready** (code, tests and docs done; v0.1.0 and v0.2.0 are committed, v0.3.0 is not; tags and releases are the owner's step). No tag has been pushed, so nothing is published. v0.4.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
 
 ## 1. Summary
 
@@ -15,13 +15,13 @@ grepui is a multi-tenant observability UI for GreptimeDB: one Rust binary (axum)
 | Tenancy | Multi-tenant from v0.1.0: org-scoped routes; orgs map to GreptimeDB databases |
 | Releases planned | 14 (v0.1.0 to v0.13.0, then v1.0.0) |
 | Requirements | 78 (`ARCH/00_requirements_traceability.md`) |
-| Acceptance criteria | 81, each governed by at least two named tests (`make ac-map`) |
+| Acceptance criteria | 82, each governed by at least two named tests (`make ac-map`) |
 | Licence | Apache-2.0 |
 | Artifacts per tag | tarballs for linux and macOS on amd64 and arm64 (with `.sha256`), multi-arch image on GHCR, GitHub Release with the notes from `RELEASE/<tag>.md` |
 
 ## 2. Release status
 
-Latest built: **v0.2.0: Logs and playground** (ready). Newest first.
+Latest built: **v0.3.0: State, saved views, stream health and the SQL-mode fix** (ready). Newest first.
 
 | Release | Theme | Status | ACs | Requirements covered |
 |---|---|---|---|---|
@@ -36,7 +36,7 @@ Latest built: **v0.2.0: Logs and playground** (ready). Newest first.
 | [v0.6.0](RELEASE/v0.6.0.md) | Metrics | planned | 2 | R-M1 R-M2 |
 | [v0.5.0](RELEASE/v0.5.0.md) | Services and service map | planned | 4 | R-V1 R-V2 R-V3 R-V4 |
 | [v0.4.0](RELEASE/v0.4.0.md) | Traces | planned | 6 | R-R1 R-R2 R-R3 R-R4 R-R5 R-R6 |
-| [v0.3.0](RELEASE/v0.3.0.md) | State, saved views and stream health | planned | 6 | R-F4 R-I2 R-S1 R-S2 R-S3 R-S4 R-S5 |
+| [v0.3.0](RELEASE/v0.3.0.md) | State, saved views, stream health and the SQL-mode fix | ready | 7 | R-F4 R-I2 R-L5 R-Q1 R-S1 R-S2 R-S3 R-S4 R-S5 |
 | [v0.2.0](RELEASE/v0.2.0.md) | Logs and playground | ready | 9 | R-G1 R-L1 R-L2 R-L3 R-L4 R-L5 R-L6 R-L7 R-Q1 |
 | [v0.1.0](RELEASE/v0.1.0.md) | Foundation | ready | 13 | R-D1 R-D2 R-D3 R-F1 R-F2 R-F3 R-F4 R-F5 R-I1 R-Q1 R-Q2 R-Q3 R-Q4 R-T1 |
 
@@ -61,11 +61,17 @@ Newest first. An entry is written when a release becomes `ready`; the same text 
 
 - Requirements, architecture, positioning and parity matrix (ARCH 00–07), release plan with ACs for v0.1.0–v1.0.0, `scripts/seed.py` (demo traces and logs over OTLP/protobuf, `--db` per org).
 
+### v0.3.0: State, saved views, stream health and the SQL-mode fix (ready)
+
+Added: `grepui migrate` and the `grepui_*` metadata database and tables (schema version, saved views, history), with one guarded writer (the write allowlist is now exactly those tables); Saved views (create, rename, delete, share by link) and recent-search history in the Logs toolbar; Stream details (size, TTL, indexes, partitions, keys) and a Data health page (freshness, rate, last seen per service, quiet-stream warning); Security fix carried from v0.2.0: SQL mode checks every SHOW/DESC variant against the org's database and refuses TQL; Playground also creates the state store; `make migrate`.
+
+First release that writes: only to the `grepui` metadata database, through `AppState::write`, which admits nothing but `INSERT INTO` the allowlisted tables (ADR 0006). Updates are upserts on (primary key, time index) and deletes are soft deletes: both verified live. Until access control (v0.11.0) the owner and history user are the implicit user `local`. Evaluated and not adopted: GreptimeDB's official Rust ingester crate (gRPC, ingestion-focused, about 106 extra crates); `sqlx` over the MySQL protocol is the recommended client for reads and for these small writes (ARCH 05). Found by live tests and fixed: `name` is a reserved word in GreptimeDB (quoted everywhere); `TIMESTAMP(3)` casts to milliseconds, not nanoseconds (an earlier divisor made history look 20 000 days old); the relation visitor misreads `SHOW TABLES FROM greptime.public`, so SHOW/DESC are checked by their own fields. Data size reads 0 B until GreptimeDB flushes a table to storage. Not yet exercised in a browser: the quiet-stream banner (covered by tests only).
+
 ### v0.2.0: Logs and playground (ready)
 
 Added: Logs page: filter bar, histogram, fields sidebar with types and quick mode, top values, expandable rows, paging; Source details and Search Around; SQL mode (parser-validated, window macros, row cap), CSV/NDJSON export; Playground mode (`grepui playground --demo-data`, `make demo`) with deterministic demo data and a live traffic trickle; Security workflow (Semgrep, Trivy filesystem and image scans) and a base image without OpenSSL.
 
-Verified live on GreptimeDB v1.2.1 (found and fixed): `INTERVAL '10 minutes'` parses over HTTP but not in MySQL prepared statements (the histogram uses integer arithmetic); `SHOW CREATE TABLE` backticks identifiers over the MySQL protocol and double-quotes them over HTTP; dotted attribute keys need the JSON path form `["http.method"]`; `LIKE` supports only the backslash escape; `DESC TABLE x` needs normalising for the SQL parser. Export is fetched then written (capped at 10 000 rows), not streamed from the database. SQL mode is confined to the org's database by parsing table references; `information_schema` is refused until access control (v0.11.0).
+Verified live on GreptimeDB v1.2.1 (found and fixed): `INTERVAL '10 minutes'` parses over HTTP but not in MySQL prepared statements (the histogram uses integer arithmetic); `SHOW CREATE TABLE` backticks identifiers over the MySQL protocol and double-quotes them over HTTP; dotted attribute keys need the JSON path form `["http.method"]`; `LIKE` supports only the backslash escape; `DESC TABLE x` needs normalising for the SQL parser. Export is fetched then written (capped at 10 000 rows), not streamed from the database. SQL mode is confined to the org's database by parsing table references; `information_schema` is refused until access control (v0.11.0). **Known issue in v0.2.0 as tagged (fixed in v0.3.0, AC0.3.7):** SQL mode did not apply the database check to `SHOW TABLES FROM <db>` and `SHOW CREATE TABLE <db>.t`, and accepted TQL, whose `__schema__`/`__database__` matchers select another database. On a server with several databases, v0.2.0 SQL mode can read another database's table names and DDL. Upgrade to v0.3.0; until then run grepui with a database account that can read only the intended database.
 
 ### v0.1.0: Foundation (ready)
 
@@ -137,12 +143,6 @@ Will add: Trace list with histogram and latency scatter; Trace detail: waterfall
 
 Schema finding (live, v1.2.1): span attributes are flat columns named `span_attributes.<key>`; log and resource attributes are JSON.
 
-### v0.3.0: State, saved views and stream health (planned)
-
-Will add: `grepui migrate` and the `grepui_*` metadata tables (schema version table, views, history); Saved views and query history; Stream details page; ingest health (rows per minute, freshness, last seen).
-
-The first release that writes (to `grepui_*` only). ARCH 06 D2 narrows to "data plane read-only".
-
 ## 5. Verified and unverified
 
 Honest ledger of what has actually been run. Updated as releases land.
@@ -154,9 +154,12 @@ Honest ledger of what has actually been run. Updated as releases land.
 | `scripts/seed.py` writes traces and logs; `opentelemetry_traces`, `opentelemetry_logs` and the `_services` / `_operations` tables appear | verified live on v1.2.1 |
 | Column names, types and roles of the two OTLP tables (span attributes are flat `span_attributes.*` columns) | verified live on v1.2.1 |
 | Bound parameters over the MySQL protocol for `approx_percentile_cont`, `TQL EVAL`, process list, `ALTER TABLE ... SET ttl`, pipeline API, Flow DDL | **not yet run**: first exercised in the release that needs each |
-| v0.1.0 and v0.2.0 code | `make check` green (offline tests + `ac-map`); `make test-db` green on GreptimeDB v1.2.1 (live tests for streams, search, histogram, search around, fulltext, playground); `cargo deny` and `cargo audit` clean; UI checked in a real browser (screenshots in `images/`) |
+| v0.1.0 to v0.3.0 code | `make check` green (offline tests + `ac-map`); `make test-db` green on GreptimeDB v1.2.1 (live tests for streams, search, histogram, search around, fulltext, playground); `cargo deny` and `cargo audit` clean; UI checked in a real browser (screenshots in `images/`) |
 | Bound timestamp parameters, `TIMESTAMP(9)` and `JSON` decoding, `information_schema` | verified live (v0.1.0): sqlx needs `DateTime<Utc>` for `TIMESTAMP` and its `json` feature for `JSON` |
 | `matches_term` with a bound term, `json_get_string` with dotted keys (path form `["k.x"]`), bound `LIKE` with backslash escapes, `CAST(CAST(ts AS BIGINT) AS VARCHAR)` nanosecond keys, `UNION ALL` of ordered limited selects, `SHOW CREATE TABLE`, `DESC TABLE`, SQL-mode window macros | verified live (v0.2.0); details in ARCH/03 |
+| State store on GreptimeDB (v0.3.0): upsert by key + time index, soft delete, org isolation, `TIMESTAMP(3)` casts to ms, reserved word `name`, migration idempotent, views read back from a second app instance | verified live (`ac_0_3_*_live`) and in a browser (save, share link, recent, data health, stream details) |
+| Quiet-stream banner on the Data health page | logic covered by tests; the banner itself **not yet seen in a browser** (needs 5 minutes of silence) |
+| SQL-mode tenant-isolation fix (SHOW/DESC variants, TQL) | reproduced against a live server, fixed, regression tests, re-verified live; **v0.2.0 as committed still has the gap** (see its release notes) |
 | `date_bin(INTERVAL '..')` in prepared statements | **fails** over the MySQL protocol (works over HTTP): the histogram uses integer arithmetic instead (found by the live test) |
 | Playground: seed through OTLP, exactly-once on restart, refusal outside `demo`/`demo_*` | verified live (`ac_0_2_9_playground_seeds_once_live`) and in a browser (live traffic trickle visible in counts) |
 | Security workflow tools | Semgrep (Rust, JS, Python, secrets, GitHub Actions, Dockerfile packs) clean on the tree; Trivy filesystem clean; Trivy image found a HIGH `libssl3` CVE in the `distroless/cc` base, **fixed** by switching to `base-nossl` + `libgcc_s` (rescanned clean, container runs); the workflow itself has not run on GitHub |

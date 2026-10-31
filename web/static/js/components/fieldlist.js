@@ -25,7 +25,7 @@ export function fieldList({ fields, params, onPick }) {
   function row(f) {
     const box = h('div', { class: 'values' });
     const canTop = TOP_OK.has(f.name);
-    const head = h('div', { class: 'field' }, h('span', { class: 'fname' }, f.name), h('span', { class: `badge ${f.role}` }, f.type));
+    const head = h('div', { class: 'frow' }, h('span', { class: 'fname' }, f.name), h('span', { class: `badge ${f.role}` }, f.type));
     if (canTop) {
       head.classList.add('clickable');
       head.addEventListener('click', () => (box.dataset.open ? (delete box.dataset.open, mount(box)) : ((box.dataset.open = '1'), showValues(f.name, box))));
@@ -34,9 +34,9 @@ export function fieldList({ fields, params, onPick }) {
       // JSON attribute columns: ask for one key at a time.
       const key = h('input', { type: 'text', placeholder: 'attribute key, Enter', 'aria-label': `${f.name} key`, spellcheck: 'false' });
       key.addEventListener('keydown', (e) => e.key === 'Enter' && key.value.trim() && showValues(`${f.name}.${key.value.trim()}`, box));
-      return h('div', { class: 'field-wrap' }, head, key, box);
+      return h('div', { class: 'frow-wrap' }, head, key, box);
     }
-    return h('div', { class: 'field-wrap' }, head, box);
+    return h('div', { class: 'frow-wrap' }, head, box);
   }
 
   const toggle = h('div', { class: 'seg', role: 'group', 'aria-label': 'Field set' }, ...['Quick', 'All'].map((l) => h('button', { type: 'button', 'aria-pressed': String((l === 'Quick') === quick), onclick: () => { quick = l === 'Quick'; paint(); } }, l)));

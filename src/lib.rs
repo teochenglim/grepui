@@ -9,6 +9,7 @@ pub mod playground;
 pub mod probe;
 pub mod query;
 pub mod server;
+pub mod store;
 pub mod ui;
 
 /// Build version, stamped by `GREPUI_VERSION` at compile time.

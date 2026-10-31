@@ -5,10 +5,11 @@ import { fieldList } from '../components/fieldlist.js';
 import { filterBar } from '../components/filterbar.js';
 import { histogram } from '../components/histogram.js';
 import { logTable } from '../components/logtable.js';
+import { applySpec, recordSearch, viewsBar } from '../components/viewsbar.js';
 import { sqlMode } from '../components/sqlmode.js';
 import { stateBox } from '../components/table.js';
 import { currentQuery, replaceQuery } from '../router.js';
-import { timeWindow } from '../state.js';
+import { state, timeWindow } from '../state.js';
 import { addCondition, cond, filterKey } from '../util/logs.js';
 import { h, mount } from '../util/dom.js';
 import { fmtNum } from '../util/format.js';
@@ -17,6 +18,16 @@ const PAGE = 100;
 
 export async function logsPage(view) {
   const qp = currentQuery();
+  // A shared link (?view=<id>): resolve the saved view, write its search into the URL, re-render.
+  if (qp.get('view')) {
+    try {
+      const { data } = await api.get(`views/${encodeURIComponent(qp.get('view'))}`);
+      applySpec(data.spec, null);
+    } catch (e) {
+      mount(view, stateBox(`Could not open the saved view: ${e.message}`, 'error'));
+    }
+    return;
+  }
   const st = { q: qp.get('q') || '', level: qp.get('level') || '', mode: qp.get('mode') === 'sql' ? 'sql' : 'search', sql: qp.get('sql') || '' };
   const w = () => ({ ...timeWindow() });
   const params = () => {
@@ -24,7 +35,9 @@ export async function logsPage(view) {
     return { from, to, q: st.q || null, level: st.level || null };
   };
 
-  const bar = filterBar({ q: st.q, level: st.level, onSubmit: (v) => { Object.assign(st, v); sync(); load(); } });
+  const getSpec = () => ({ q: st.q, level: st.level, range: state.range, mode: st.mode, sql: st.mode === 'sql' ? st.sql : '' });
+  const views = viewsBar({ kind: 'logs', getSpec });
+  const bar = filterBar({ q: st.q, level: st.level, onSubmit: (v) => { Object.assign(st, v); sync(); load(); recordSearch('logs', getSpec()); } });
   const histBox = h('div', { class: 'card' });
   const results = h('div');
   const fieldBox = h('div');
@@ -87,12 +100,12 @@ export async function logsPage(view) {
 
   async function render() {
     if (st.mode === 'sql') {
-      mount(view, h('div', { class: 'page-head' }, h('h2', null, 'Logs'), h('div', { class: 'seg' }, modeBtn('search', 'Search'), modeBtn('sql', 'SQL'))),
-        sqlMode({ sql: st.sql, onChange: (s) => { st.sql = s; sync(); } }));
+      mount(view, h('div', { class: 'page-head' }, h('h2', null, 'Logs'), h('div', { class: 'seg' }, modeBtn('search', 'Search'), modeBtn('sql', 'SQL')), h('span', { class: 'grow' }), views),
+        sqlMode({ sql: st.sql, onChange: (s) => { st.sql = s; sync(); recordSearch('logs', getSpec()); } }));
       return;
     }
     mount(view,
-      h('div', { class: 'page-head' }, h('h2', null, 'Logs'), h('div', { class: 'seg' }, modeBtn('search', 'Search'), modeBtn('sql', 'SQL')), h('span', { class: 'grow' }), summary, h('span', { class: 'muted' }, 'Export'), exportLink('csv'), exportLink('ndjson')),
+      h('div', { class: 'page-head' }, h('h2', null, 'Logs'), h('div', { class: 'seg' }, modeBtn('search', 'Search'), modeBtn('sql', 'SQL')), h('span', { class: 'grow' }), views, summary, h('span', { class: 'muted' }, 'Export'), exportLink('csv'), exportLink('ndjson')),
       bar.el, histBox,
       h('div', { class: 'split' }, fieldBox, h('div', { class: 'grow' }, results)));
     load();

@@ -13,6 +13,17 @@ struct Cli {
 enum Cmd {
     /// Run the UI and API.
     Serve(#[command(flatten)] Box<Config>),
+    /// Create or upgrade grepui's own tables (saved views, history) in GreptimeDB. Idempotent.
+    Migrate {
+        #[command(flatten)]
+        cfg: Box<Config>,
+        /// Print the SQL and exit; no database connection.
+        #[arg(long)]
+        print: bool,
+        /// Keep retrying for up to this many seconds while GreptimeDB starts.
+        #[arg(long, default_value_t = 0)]
+        wait: u64,
+    },
     /// Wait for GreptimeDB, optionally seed demo data into a `demo` database, then serve.
     Playground {
         #[command(flatten)]
@@ -56,6 +67,7 @@ async fn main() -> Result<()> {
         .init();
     match Cli::parse().cmd {
         Cmd::Serve(cfg) => server::serve(*cfg).await,
+        Cmd::Migrate { cfg, print, wait } => server::migrate(*cfg, print, wait).await,
         Cmd::Playground {
             cfg,
             greptime_http,

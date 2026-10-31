@@ -254,13 +254,21 @@ fn fill(route: &str) -> String {
         .replace("{org}", "default")
         .replace("{name}", "t")
         .replace("{field}", "severity_text")
+        .replace("{id}", "0123456789abcdef")
 }
 
 #[tokio::test]
 async fn ac_0_1_4_non_get_rejected() {
+    // Every route rejects a state-changing method unless it is declared in WRITE_ROUTES (v0.3.0).
     let a = app(Fake::new(sample_db));
     for route in ROUTES {
         for m in [Method::POST, Method::PUT, Method::PATCH, Method::DELETE] {
+            if grepui::api::WRITE_ROUTES
+                .iter()
+                .any(|(wm, wp)| wp == route && *wm == m.as_str())
+            {
+                continue;
+            }
             let r = send(&a, m.clone(), &fill(route)).await;
             assert_eq!(r.status, StatusCode::METHOD_NOT_ALLOWED, "{m} {route}");
         }
@@ -315,10 +323,11 @@ fn ac_0_1_4_builders_are_read_only() {
 }
 
 #[test]
-fn ac_0_1_4_write_allowlist_is_empty() {
-    assert!(
-        WRITE_TARGETS.is_empty(),
-        "v0.1.0 has no write targets; the metadata store arrives in v0.3.0 (ADR 0004)"
+fn ac_0_1_4_write_allowlist_is_pinned() {
+    // v0.1.0/0.2.0 had no write targets; from v0.3.0 they are exactly the metadata tables (ADR 0004).
+    assert_eq!(
+        WRITE_TARGETS,
+        ["grepui_schema", "grepui_views", "grepui_history"]
     );
 }
 

@@ -56,6 +56,77 @@ pub fn stream_sample(db: &str, table: &str, ts_col: &str, w: Window) -> anyhow::
     ))
 }
 
+/// Newest row per stream within a bounded look-back, in one statement (R-I2).
+pub fn ingest_freshness(
+    db: &str,
+    traces_table: &str,
+    logs_table: &str,
+    since_ms: i64,
+) -> anyhow::Result<Q> {
+    let (l, t) = (qualified(db, logs_table)?, qualified(db, traces_table)?);
+    Ok(Q::new(
+        "ingest_freshness",
+        format!(
+            "SELECT 'logs' AS stream, max(`timestamp`) AS newest FROM {l} WHERE `timestamp` >= ? UNION ALL SELECT 'traces' AS stream, max(`timestamp`) AS newest FROM {t} WHERE `timestamp` >= ?"
+        ),
+        vec![
+            Bind::Str(ts_string(since_ms)),
+            Bind::Str(ts_string(since_ms)),
+        ],
+    ))
+}
+
+/// Rows per bucket for one stream; the bucket size comes from the fixed set in `logs::BUCKETS`.
+pub fn ingest_rate(db: &str, table: &str, w: Window) -> anyhow::Result<Q> {
+    let t = qualified(db, table)?;
+    let (ms, _) = logs::bucket_for(w.to_ms - w.from_ms);
+    Ok(Q::new(
+        "ingest_rate",
+        format!(
+            "SELECT (CAST(`timestamp` AS BIGINT) / {}) * {ms} AS bucket_ms, count(*) AS n FROM {t} WHERE `timestamp` >= ? AND `timestamp` < ? GROUP BY 1 ORDER BY 1",
+            ms * 1_000_000
+        ),
+        vec![
+            Bind::Str(ts_string(w.from_ms)),
+            Bind::Str(ts_string(w.to_ms)),
+        ],
+    ))
+}
+
+/// Last span per service within the window (the traces table's `service_name` tag).
+pub fn ingest_services(db: &str, traces_table: &str, w: Window) -> anyhow::Result<Q> {
+    let t = qualified(db, traces_table)?;
+    Ok(Q::new(
+        "ingest_services",
+        format!(
+            "SELECT `service_name`, max(`timestamp`) AS last_seen, count(*) AS spans FROM {t} WHERE `timestamp` >= ? AND `timestamp` < ? GROUP BY 1 ORDER BY 2 DESC LIMIT 200"
+        ),
+        vec![
+            Bind::Str(ts_string(w.from_ms)),
+            Bind::Str(ts_string(w.to_ms)),
+        ],
+    ))
+}
+
+/// Table-level facts from `information_schema`: size, row estimate, engine, creation options.
+pub fn stream_info(db: &str, table: &str) -> Q {
+    Q::new(
+        "stream_info",
+        "SELECT table_name, engine, table_rows, data_length, index_length, create_options \
+         FROM information_schema.tables WHERE table_schema = ? AND table_name = ?",
+        vec![Bind::Str(db.into()), Bind::Str(table.into())],
+    )
+}
+
+/// `SHOW CREATE TABLE`: indexes, partitions, TTL and options live in the DDL.
+pub fn show_create(db: &str, table: &str) -> anyhow::Result<Q> {
+    Ok(Q::new(
+        "stream_ddl",
+        format!("SHOW CREATE TABLE {}", qualified(db, table)?),
+        vec![],
+    ))
+}
+
 /// Every builder with representative arguments; the read-only test iterates this (R-F4).
 pub fn all_for_tests() -> Vec<Q> {
     let w = Window {
@@ -82,5 +153,10 @@ pub fn all_for_tests() -> Vec<Q> {
         logs::record("public", "l", 1_760_000_000_000_000_000).expect("valid idents"),
         logs::around("public", "l", 1_760_000_000_000_000_000, 5, 5).expect("valid idents"),
         logs::ddl("public", "l").expect("valid idents"),
+        ingest_freshness("public", "t", "l", 0).expect("valid idents"),
+        ingest_rate("public", "t", w).expect("valid idents"),
+        ingest_services("public", "t", w).expect("valid idents"),
+        stream_info("public", "t"),
+        show_create("public", "t").expect("valid idents"),
     ]
 }

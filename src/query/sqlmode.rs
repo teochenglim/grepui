@@ -1,10 +1,10 @@
-//! SQL mode (R-L5): the one place user-written SQL runs. A SQL *parser* (not a regex) accepts
+//! SQL mode (R-L5): the one place user-written SQL runs. TQL is refused (see `check`). A SQL *parser* (not a regex) accepts
 //! exactly one read-only statement, rejects anything that could write, change state or read
 //! another tenant's database, and the caller still applies a row cap and a timeout.
 //! The real boundary remains a database account without write rights (ARCH 01).
 
 use sqlparser::{
-    ast::{Query, SetExpr, Statement, visit_relations},
+    ast::{ObjectName, Query, SetExpr, ShowStatementOptions, Statement, visit_relations},
     dialect::MySqlDialect,
     parser::Parser,
     tokenizer::{Token, Tokenizer},
@@ -60,18 +60,15 @@ pub fn check(sql: &str, database: &str) -> Result<(), Reject> {
             return no(format!("{} is not allowed in SQL mode", w.value));
         }
     }
-    // GreptimeDB's TQL (PromQL over SQL) is not standard SQL; accept only its read forms.
-    let lower = sql.trim_end_matches(';').trim().to_ascii_lowercase();
-    if let Some(rest) = lower.strip_prefix("tql") {
-        let verb = rest.split_whitespace().next().unwrap_or_default();
-        if lower.contains(';') {
-            return no("only one statement is allowed");
-        }
-        return if matches!(verb, "eval" | "evaluate" | "explain" | "analyze") {
-            Ok(())
-        } else {
-            no("only TQL EVAL, EXPLAIN and ANALYZE are allowed")
-        };
+    // GreptimeDB's TQL (PromQL over SQL) can select another database with the `__schema__` /
+    // `__database__` matchers, which no SQL-level check here can see. Until PromQL runs through a
+    // typed endpoint that rejects those matchers (v0.6.0), TQL is not available in SQL mode.
+    if sql
+        .trim_start()
+        .get(..3)
+        .is_some_and(|p| p.eq_ignore_ascii_case("tql"))
+    {
+        return no("TQL is not available in SQL mode; PromQL arrives with Metrics in v0.6.0");
     }
     // GreptimeDB accepts `DESC TABLE t`; the MySQL dialect only knows `DESC t`.
     let normalised = strip_desc_table(sql);
@@ -80,9 +77,15 @@ pub fn check(sql: &str, database: &str) -> Result<(), Reject> {
     let [stmt] = stmts.as_slice() else {
         return no("exactly one statement is allowed");
     };
-    check_statement(stmt)?;
+    check_statement(stmt, database)?;
+    // Queries: every table in FROM/JOIN/subqueries/CTEs. SHOW and DESC were checked above, by
+    // their own fields (the visitor would misread `SHOW TABLES FROM greptime.public`).
     let mut bad = None;
+    let is_query = matches!(stmt, Statement::Query(_) | Statement::Explain { .. });
     let _ = visit_relations(stmt, |name| {
+        if !is_query {
+            return ControlFlow::<()>::Continue(());
+        }
         let parts: Vec<String> = name
             .0
             .iter()
@@ -123,19 +126,91 @@ fn strip_desc_table(sql: &str) -> String {
     sql.to_string()
 }
 
-fn check_statement(s: &Statement) -> Result<(), Reject> {
+/// Is this table-like name inside `database`? A bare name resolves in the connection's database;
+/// `schema.table` and `catalog.schema.table` must name it explicitly.
+fn name_in(name: &ObjectName, database: &str) -> bool {
+    let parts: Vec<String> = name
+        .0
+        .iter()
+        .map(|p| {
+            p.to_string()
+                .trim_matches(|c| c == '`' || c == '"')
+                .to_string()
+        })
+        .collect();
+    match parts.as_slice() {
+        [_] => true,
+        [schema, _] => schema == database,
+        [catalog, schema, _] => catalog.eq_ignore_ascii_case("greptime") && schema == database,
+        _ => false,
+    }
+}
+
+/// `SHOW ... FROM|IN <parent>`: the parent is a database for TABLES and a table for COLUMNS.
+fn show_scope_ok(opts: &ShowStatementOptions, database: &str, parent_is_database: bool) -> bool {
+    match opts.show_in.as_ref().and_then(|i| i.parent_name.as_ref()) {
+        None => true,
+        Some(n) if parent_is_database => {
+            let parts: Vec<String> =
+                n.0.iter()
+                    .map(|p| {
+                        p.to_string()
+                            .trim_matches(|c| c == '`' || c == '"')
+                            .to_string()
+                    })
+                    .collect();
+            match parts.as_slice() {
+                [db] => db == database,
+                [catalog, db] => catalog.eq_ignore_ascii_case("greptime") && db == database,
+                _ => false,
+            }
+        }
+        Some(n) => name_in(n, database),
+    }
+}
+
+fn check_statement(s: &Statement, database: &str) -> Result<(), Reject> {
+    let outside = || {
+        no(format!(
+            "that object is outside this org's database ({database})"
+        ))
+    };
     match s {
         Statement::Query(q) => check_query(q),
         Statement::Explain { statement, .. } => match statement.as_ref() {
             Statement::Query(q) => check_query(q),
             _ => no("EXPLAIN is allowed only for SELECT queries"),
         },
-        Statement::ShowTables { .. }
-        | Statement::ShowColumns { .. }
-        | Statement::ShowCreate { .. }
-        | Statement::ExplainTable { .. } => Ok(()),
+        Statement::ShowTables { show_options, .. } => {
+            if show_scope_ok(show_options, database, true) {
+                Ok(())
+            } else {
+                outside()
+            }
+        }
+        Statement::ShowColumns { show_options, .. } => {
+            if show_scope_ok(show_options, database, false) {
+                Ok(())
+            } else {
+                outside()
+            }
+        }
+        Statement::ShowCreate { obj_name, .. } => {
+            if name_in(obj_name, database) {
+                Ok(())
+            } else {
+                outside()
+            }
+        }
+        Statement::ExplainTable { table_name, .. } => {
+            if name_in(table_name, database) {
+                Ok(())
+            } else {
+                outside()
+            }
+        }
         _ => no(
-            "only SELECT, WITH, SHOW TABLES, SHOW COLUMNS, SHOW CREATE, DESC, EXPLAIN and TQL are allowed",
+            "only SELECT, WITH, SHOW TABLES, SHOW COLUMNS, SHOW CREATE, DESC and EXPLAIN are allowed",
         ),
     }
 }

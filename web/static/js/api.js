@@ -13,10 +13,10 @@ export function resetQueries() {
   listeners.forEach((f) => f());
 }
 
-async function request(url) {
+async function request(url, opts = {}) {
   let res;
   try {
-    res = await fetch(url, { headers: { Accept: 'application/json' } });
+    res = await fetch(url, { ...opts, headers: { Accept: 'application/json', ...(opts.headers || {}) } });
   } catch {
     throw new Error('Cannot reach grepui. Is the server running?');
   }
@@ -44,3 +44,18 @@ export async function get(path, params = {}) {
 }
 
 export const global = (path) => request(`/api/v1/${path}`);
+
+/** POST/PUT/DELETE under /api/v1/orgs/{org}/: JSON in, { data, meta } out. */
+export async function send(method, path, body) {
+  const url = `/api/v1/orgs/${encodeURIComponent(state.org)}/${path}`;
+  const res = await request(url, {
+    method,
+    headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (res.meta) {
+    metas.push(res.meta);
+    listeners.forEach((f) => f());
+  }
+  return res;
+}

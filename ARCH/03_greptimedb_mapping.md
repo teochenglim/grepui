@@ -52,3 +52,10 @@ Each is one function in the query builders, so a dialect fix is a small edit. `_
 | `TIMESTAMP(9)` / `JSON` result columns | sqlx needs `DateTime<Utc>` and its `json` feature |
 | `DESC TABLE t`, `SHOW TABLES`, `SHOW CREATE TABLE` through SQL mode | work |
 | OTLP ingest | protobuf only; `x-greptime-db-name` selects the database |
+| Upsert by primary key + time index (`INSERT` the same `(org_id, view_id, ts)` again) | works: one row, latest write wins; `deleted = false` filtering hides soft-deleted rows |
+| Reserved words | `name` must be quoted as a column name (`Cannot use keyword 'name'`) |
+| `CAST(ts AS BIGINT)` for `TIMESTAMP(3)` | milliseconds (for `TIMESTAMP(9)` it is nanoseconds) |
+| Missing table / database error text | `Table not found: ...` / `Database not found: ...` (recognised as "run `grepui migrate`") |
+| `information_schema.tables` | `data_length`, `index_length`, `table_rows`, `engine`, `create_options`; sizes are 0 until a table is flushed to storage |
+| `WITH (ttl = '30d')` | stored and echoed by `SHOW CREATE TABLE` as `ttl = '30days'` |
+| Backtick-quoted column list `PARTITION ON COLUMNS`, `FULLTEXT INDEX`, `SKIPPING INDEX`, `INVERTED INDEX` | parsed from `SHOW CREATE TABLE` (the fulltext line verified live; the others from the documented syntax) |

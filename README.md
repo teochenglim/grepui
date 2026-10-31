@@ -4,7 +4,7 @@ A multi-tenant observability UI for [GreptimeDB](https://greptime.com), in one R
 
 grepui reads what your collectors already send to GreptimeDB. It does not ingest telemetry itself. Every panel can show the SQL it ran ("Show SQL"), and every route is scoped to an org (a tenant mapped to a GreptimeDB database).
 
-**Status: v0.2.0 (logs).** Available now: Logs (filter bar, histogram, fields with types and top values, expandable records with Search Around, SQL mode, CSV/NDJSON export), Streams, Connect (how to send OTLP and Prometheus data, with copy-ready snippets), org switcher, time range, Show SQL, and a playground mode with demo data. Traces, services, metrics, dashboards, alerts and the enterprise tier are planned: see [RELEASE.md](RELEASE.md) for the plan and [ARCH/07_parity_matrix.md](ARCH/07_parity_matrix.md) for the feature comparison and gaps.
+**Status: v0.3.0 (state and data health).** Available now: saved views (shareable by link) and recent searches, Data health (is data arriving, how fast, which service went quiet), stream details (size, TTL, indexes), and Logs (filter bar, histogram, fields with types and top values, expandable records with Search Around, SQL mode, CSV/NDJSON export), Streams, Connect (how to send OTLP and Prometheus data, with copy-ready snippets), org switcher, time range, Show SQL, and a playground mode with demo data. Traces, services, metrics, dashboards, alerts and the enterprise tier are planned: see [RELEASE.md](RELEASE.md) for the plan and [ARCH/07_parity_matrix.md](ARCH/07_parity_matrix.md) for the feature comparison and gaps.
 
 ## Try it
 
@@ -15,7 +15,9 @@ make playground           # seeds a `demo` database with demo traces + logs, kee
 
 Or everything in docker: `make demo` (one grepui container in playground mode, no seed step).
 
-Playground writes demo data **only** to a database named `demo` or `demo_*`, only when it is empty, and only from `grepui playground --demo-data`; `grepui serve` never writes telemetry ([ADR 0005](docs/adr/0005-playground-mode-demo-data.md)). To use your own data: `make run` against a GreptimeDB that your collectors write to (see the Connect page).
+Playground writes demo data **only** to a database named `demo` or `demo_*`, only when it is empty, and only from `grepui playground --demo-data`; `grepui serve` never writes telemetry ([ADR 0005](docs/adr/0005-playground-mode-demo-data.md)). grepui keeps its own state (saved views, history) in a `grepui` database in the same GreptimeDB. Create it once with `grepui migrate` (idempotent; the playground does it for you); `serve` warns and the state endpoints answer 503 until you do. The telemetry databases still only need read access; the account needs write access to the `grepui` database ([ADR 0006](docs/adr/0006-state-store-in-greptimedb.md)).
+
+To use your own data: `make migrate && make run` against a GreptimeDB that your collectors write to (see the Connect page).
 
 ## Configuration
 
@@ -31,6 +33,8 @@ Flags, with environment variables for containers:
 
 `grepui playground --demo-data [--wait 90] [--traces 300] [--minutes 120] [--seed 7] [--no-live] [--greptime-http http://host:4000]` seeds and serves; `GREPTIME_HTTP` is where it writes (defaults to `--greptime-http-public`).
 
+`grepui migrate [--print] [--wait 30] [--meta-database grepui]` creates or upgrades the state store (`--print` shows the SQL without connecting).
+
 `grepui healthcheck` exits 0 when a running instance answers `/healthz` (used by the container health check).
 
 ## API
@@ -42,6 +46,10 @@ All data routes are `GET /api/v1/orgs/{org}/...` and return `{ "data": ..., "met
 | `/healthz`, `/api/v1/health`, `/api/v1/info`, `/api/v1/orgs` | liveness, readiness, version, orgs |
 | `/streams` | tables with kind and row estimate |
 | `/streams/{name}`, `/stats`, `/sample?from&to&limit` | schema with roles, exact count and time range, newest rows |
+| `/views` (GET, POST), `/views/{id}` (GET, PUT, DELETE) | saved views: `{name, kind: logs\|sql, spec: {q, level, range, mode, sql}}`; JSON bodies only, 64 KB max |
+| `/history` (GET, POST) | the last 100 searches (30 days); an identical repeat is not stored |
+| `/ingest/freshness`, `/ingest/rate`, `/ingest/services` | newest row per stream and quiet warning, rows per bucket, last span per service |
+| `/streams/{name}/info`, `/streams/{name}/ddl` | size and engine; indexes, partitions, TTL and keys from `SHOW CREATE TABLE` |
 | `/connect` | endpoints, headers and snippets for sending telemetry |
 | `/logs?from&to&q&level&limit&offset` | search; `q` is the filter bar (`key=value`, `key!=value`, `key~substring`, `"quoted text"`) |
 | `/logs/histogram`, `/logs/fields`, `/logs/fields/{field}/values` | hits over time, columns with types, top values |
@@ -51,7 +59,7 @@ All data routes are `GET /api/v1/orgs/{org}/...` and return `{ "data": ..., "met
 
 ## Safety
 
-The data plane is read-only by construction: telemetry tables are reached only through fixed SELECT/SHOW builders with bound parameters, identifiers are validated, and the list of things grepui may ever write is a single allowlist that tests pin (empty in v0.1.0). Run it with a GreptimeDB account that can read your telemetry tables. See [ARCH/01_architecture.md](ARCH/01_architecture.md).
+The data plane is read-only by construction: telemetry tables are reached only through fixed SELECT/SHOW builders with bound parameters, identifiers are validated, and the list of things grepui may ever write is a single allowlist that tests pin: its own `grepui_schema`, `grepui_views` and `grepui_history` tables (plus the playground's demo data into a `demo` database). SQL mode is confined to the org's database for every statement variant, and TQL is not available in it. Run it with a GreptimeDB account that can read your telemetry tables. See [ARCH/01_architecture.md](ARCH/01_architecture.md).
 
 ## Develop
 

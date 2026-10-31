@@ -12,7 +12,7 @@ pub mod synth;
 
 use crate::{
     config::Config,
-    query::{Q, Reader, SqlxReader, build, ident, qualified},
+    query::{Q, Reader, SqlxReader, ident, qualified},
 };
 use anyhow::{Result, bail};
 use std::{sync::Arc, time::Duration};
@@ -120,35 +120,17 @@ pub async fn send(
     Ok(())
 }
 
-/// The same server with `/public` as the database.
-pub fn admin_url(mysql: &str) -> Result<String> {
-    let mut u = url::Url::parse(mysql)?;
-    u.set_path("/public");
-    Ok(u.to_string())
-}
-
-async fn wait_for_db(reader: &dyn Reader, secs: u64) -> Result<()> {
-    let deadline = std::time::Instant::now() + Duration::from_secs(secs);
-    loop {
-        match reader.fetch(&build::health()).await {
-            Ok(_) => return Ok(()),
-            Err(e) if std::time::Instant::now() >= deadline => {
-                bail!("GreptimeDB is not reachable after {secs}s: {}", e.detail())
-            }
-            Err(_) => tokio::time::sleep(Duration::from_secs(2)).await,
-        }
-    }
-}
-
 /// Everything before serving: wait, guard, seed, start the live trickle.
 pub async fn prepare(cfg: &Config, o: &Opts) -> Result<()> {
     cfg.validate()?;
     // Connect to `public`, which always exists: the demo database may not exist yet.
     let reader = Arc::new(SqlxReader::lazy(
-        &admin_url(&cfg.greptime_mysql)?,
+        &crate::config::admin_url(&cfg.greptime_mysql)?,
         Duration::from_secs(cfg.query_timeout_secs),
     )?);
-    wait_for_db(reader.as_ref(), o.wait_secs).await?;
+    crate::query::wait_for_db(reader.as_ref(), o.wait_secs).await?;
+    // The playground owns its stack, so it also creates the state store (saved views, history).
+    crate::store::migrate(reader.as_ref(), reader.as_ref(), &cfg.meta_database).await?;
     if !o.demo_data {
         return Ok(());
     }

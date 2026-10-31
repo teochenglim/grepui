@@ -10,7 +10,7 @@ UI behaviour is checked by API-level tests plus a recorded manual/browser pass p
 
 Parity with the reference platform is tracked in [07_parity_matrix.md](07_parity_matrix.md); every "planned" row there points at an ID below.
 
-78 requirements, 81 acceptance criteria.
+78 requirements, 82 acceptance criteria.
 
 | ID | Area | Requirement |
 |---|---|---|
@@ -30,7 +30,7 @@ Parity with the reference platform is tracked in [07_parity_matrix.md](07_parity
 | R-L2 | Logs | Log histogram over the same filters; bucket size chosen from the window from a fixed set |
 | R-L3 | Logs | Field list with types, interesting-fields (quick) mode, and top values per allowlisted field for the current filters |
 | R-L4 | Logs | Source details for one record, and Search Around: N neighbouring records in storage order, ignoring the original filters |
-| R-L5 | Logs | SQL mode: exactly one read-only statement (SELECT, WITH, SHOW, DESC, TQL, EXPLAIN) validated by a SQL parser, with row cap, window macros, timeout |
+| R-L5 | Logs | SQL mode: exactly one read-only statement (SELECT, WITH, SHOW, DESC, EXPLAIN) validated by a SQL parser and confined to the org's database for every statement variant, with row cap, window macros, timeout. TQL is refused (its `__schema__`/`__database__` matchers reach other databases) |
 | R-L6 | Logs | Full-text search over `body` using GreptimeDB's term matching, with a documented fallback when the fulltext index is absent |
 | R-L7 | Logs | Export of the current result as CSV or NDJSON, capped at 10 000 rows; spreadsheet formulas in text cells are defused |
 | R-G1 | Demo | Playground mode: `grepui playground --demo-data` waits for GreptimeDB, seeds deterministic demo traces and logs through GreptimeDB's OTLP endpoint, and keeps a trickle of live demo traffic going. It writes only to a database named `demo` or `demo_*`, only when it has no traces, and only from this command: `serve` has no ingest path (ADR 0005) |
@@ -49,7 +49,7 @@ Parity with the reference platform is tracked in [07_parity_matrix.md](07_parity
 | R-V2 | Services | RED time series per service and operation breakdown |
 | R-V3 | Services | Service dependencies (caller to callee, calls, errors) and graph layout data for the service map |
 | R-V4 | Services | Service catalog: every service seen, first/last seen, RED summary, editable annotations (owner, tier, links) |
-| R-M1 | Metrics | PromQL range and instant queries through `TQL EVAL`, with window/step caps |
+| R-M1 | Metrics | PromQL range and instant queries through `TQL EVAL`, with window/step caps; matchers named `__schema__` or `__database__` (and any escaped spelling) are rejected because they select another database |
 | R-M2 | Metrics | Metric and label name lists; SQL queries against metric tables; chart-type and query encoded in a shareable URL |
 | R-P1 | Rollup | Planner: for windows over the raw limit read the Flow rollup if it exists, otherwise raw with a warning |
 | R-P2 | Rollup | Responses state their `source` (`raw` or `rollup_1m`) and precision limits (no p95 from a rollup) |

@@ -9,11 +9,17 @@ use grepui::{
     api::{AppState, router},
     config::Config,
     error::ReadError,
-    query::{Q, Reader},
+    query::{Bind, Q, Reader, Writer},
 };
 use http_body_util::BodyExt;
 use serde_json::{Value, json};
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicI64, Ordering},
+    },
+};
 use tower::ServiceExt;
 
 type Script = Box<dyn Fn(&Q) -> Result<Vec<Value>, ReadError> + Send + Sync>;
@@ -83,6 +89,25 @@ pub fn sample_db(q: &Q) -> Result<Vec<Value>, ReadError> {
             json!({"value": "ERROR", "n": 10}),
         ],
         "sql_mode" => vec![json!({"b": 1, "a": 2})],
+        "view_get" | "view_list" => vec![
+            json!({"view_id": "0123456789abcdef", "owner": "local", "name": "errors", "kind": "logs", "spec": "{\"level\":\"ERROR\"}", "created_ms": 1000, "updated_ms": 2000}),
+        ],
+        "history_list" => vec![json!({"kind": "logs", "spec": "{\"q\":\"a=b\"}", "at_ms": 5000})],
+        "ingest_freshness" => vec![
+            json!({"stream": "logs", "newest": 1_793_399_269_857i64}),
+            json!({"stream": "traces", "newest": null}),
+        ],
+        "ingest_rate" => vec![
+            json!({"bucket_ms": 1_793_399_100_000i64, "n": 60}),
+            json!({"bucket_ms": 1_793_399_160_000i64, "n": 120}),
+        ],
+        "ingest_services" => {
+            vec![json!({"service_name": "cart", "last_seen": 1_793_399_269_857i64, "spans": 10})]
+        }
+        "stream_info" => vec![
+            json!({"table_name": "opentelemetry_logs", "engine": "mito", "table_rows": 2016, "data_length": 48051, "index_length": 386, "create_options": "greptime.semantic.signal_type=log append_mode=true"}),
+        ],
+        "stream_ddl" => vec![json!({"Table": "opentelemetry_logs", "Create Table": FULLTEXT_DDL})],
         "stream_sample" => {
             vec![json!({"timestamp": 1_760_003_600_000i64, "service_name": "cart", "body": "ok"})]
         }
@@ -153,3 +178,162 @@ pub async fn get(app: &Router, uri: &str) -> Resp {
 }
 
 pub const NOW_MS: i64 = 1_760_003_600_000;
+
+// ---- in-memory state store ----------------------------------------------------
+
+/// Behaves like the `grepui_*` tables for the queries the store builds: upsert by key, soft
+/// delete, org scoping, history retention and ordering. Reads of anything else go to `sample_db`.
+#[derive(Default)]
+pub struct MemStore {
+    pub views: Mutex<HashMap<(String, String), Vec<Bind>>>,
+    pub history: Mutex<Vec<Vec<Bind>>>,
+    pub version: Mutex<Option<i64>>,
+    pub ddl: Mutex<Vec<String>>,
+    pub writes: Mutex<Vec<Q>>,
+    pub fail_missing: Mutex<bool>,
+}
+
+fn s_of(b: &Bind) -> String {
+    b.show()
+}
+fn i_of(b: &Bind) -> i64 {
+    if let Bind::Int(i) = b { *i } else { 0 }
+}
+fn parse_ts(s: &str) -> i64 {
+    chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f")
+        .map(|d| d.and_utc().timestamp_millis())
+        .unwrap_or(0)
+}
+
+impl MemStore {
+    pub fn new() -> Arc<MemStore> {
+        Arc::new(MemStore::default())
+    }
+    fn view_json(b: &[Bind]) -> Value {
+        json!({"view_id": s_of(&b[1]), "owner": s_of(&b[2]), "name": s_of(&b[3]), "kind": s_of(&b[4]), "spec": s_of(&b[5]), "created_ms": i_of(&b[6]), "updated_ms": i_of(&b[7])})
+    }
+    pub fn write_count(&self) -> usize {
+        self.writes.lock().unwrap().len()
+    }
+}
+
+#[async_trait]
+impl Reader for MemStore {
+    async fn fetch(&self, q: &Q) -> Result<Vec<Value>, ReadError> {
+        if *self.fail_missing.lock().unwrap() && q.sql.contains("grepui_") {
+            return Err(ReadError::Db(
+                "Table not found: greptime.grepui.grepui_views".into(),
+            ));
+        }
+        Ok(match q.name {
+            "schema_get" => self
+                .version
+                .lock()
+                .unwrap()
+                .map(|v| vec![json!({"version": v})])
+                .unwrap_or_default(),
+            "view_get" => {
+                let (org, id) = (s_of(&q.binds[0]), s_of(&q.binds[1]));
+                self.views
+                    .lock()
+                    .unwrap()
+                    .get(&(org, id))
+                    .filter(|b| b[8] == Bind::Bool(false))
+                    .map(|b| vec![Self::view_json(b)])
+                    .unwrap_or_default()
+            }
+            "view_list" => {
+                let org = s_of(&q.binds[0]);
+                let kind = q.binds.get(1).map(s_of);
+                let mut rows: Vec<_> = self
+                    .views
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|((o, _), b)| {
+                        *o == org
+                            && b[8] == Bind::Bool(false)
+                            && kind.as_ref().is_none_or(|k| s_of(&b[4]) == *k)
+                    })
+                    .map(|(_, b)| (i_of(&b[7]), Self::view_json(b)))
+                    .collect();
+                rows.sort_by_key(|(u, _)| std::cmp::Reverse(*u));
+                rows.into_iter().map(|(_, v)| v).collect()
+            }
+            "history_list" => {
+                let (org, user) = (s_of(&q.binds[0]), s_of(&q.binds[1]));
+                let has_kind = q.binds.len() == 4;
+                let kind = has_kind.then(|| s_of(&q.binds[2]));
+                let since = parse_ts(&s_of(q.binds.last().unwrap()));
+                let limit: usize = q
+                    .sql
+                    .rsplit("LIMIT ")
+                    .next()
+                    .and_then(|n| n.trim().parse().ok())
+                    .unwrap_or(100);
+                let mut rows: Vec<(i64, Value)> = self.history.lock().unwrap().iter().filter(|b| s_of(&b[0]) == org && s_of(&b[1]) == user && kind.as_ref().is_none_or(|k| s_of(&b[2]) == *k) && parse_ts(&s_of(&b[4])) >= since).map(|b| (parse_ts(&s_of(&b[4])), json!({"kind": s_of(&b[2]), "spec": s_of(&b[3]), "at_ms": parse_ts(&s_of(&b[4]))}))).collect();
+                rows.sort_by_key(|(t, _)| std::cmp::Reverse(*t));
+                rows.into_iter().take(limit).map(|(_, v)| v).collect()
+            }
+            _ => sample_db(q)?,
+        })
+    }
+}
+
+#[async_trait]
+impl Writer for MemStore {
+    async fn exec(&self, q: &Q) -> Result<u64, ReadError> {
+        self.writes.lock().unwrap().push(q.clone());
+        match q.name {
+            "view_put" => {
+                self.views
+                    .lock()
+                    .unwrap()
+                    .insert((s_of(&q.binds[0]), s_of(&q.binds[1])), q.binds.clone());
+            }
+            "history_add" => self.history.lock().unwrap().push(q.binds.clone()),
+            "schema_put" => *self.version.lock().unwrap() = Some(i_of(&q.binds[1])),
+            other => return Err(ReadError::Db(format!("unexpected write {other}"))),
+        }
+        Ok(1)
+    }
+    async fn ddl(&self, sql: &str) -> Result<(), ReadError> {
+        self.ddl.lock().unwrap().push(sql.to_string());
+        Ok(())
+    }
+}
+
+/// An app wired to a [`MemStore`] and a clock the test controls.
+pub fn app_with_store(store: &Arc<MemStore>, clock: &Arc<AtomicI64>) -> Router {
+    let c = clock.clone();
+    router(
+        AppState::with_parts(
+            Config::default(),
+            store.clone(),
+            store.clone(),
+            Arc::new(move || c.load(Ordering::SeqCst)),
+        )
+        .expect("state"),
+    )
+}
+
+pub async fn send_json(app: &Router, method: Method, uri: &str, body: &Value) -> Resp {
+    let r = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(method)
+                .uri(uri)
+                .header("content-type", "application/json")
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let (parts, body) = r.into_parts();
+    Resp {
+        status: parts.status,
+        headers: parts.headers,
+        body: body.collect().await.unwrap().to_bytes().to_vec(),
+    }
+}

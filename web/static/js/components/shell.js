@@ -11,6 +11,7 @@ import { timeRange } from './timerange.js';
 const LIVE = [
   ['logs', 'Logs'],
   ['streams', 'Streams'],
+  ['health', 'Data health'],
   ['connect', 'Connect'],
 ];
 const SOON = [

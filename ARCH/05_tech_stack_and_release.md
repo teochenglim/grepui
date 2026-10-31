@@ -11,11 +11,20 @@
 | sqlparser (visitor) | Validate SQL mode input by AST, find table references (R-L5) | 0.2 |
 | futures-util | Read result rows as a stream so SQL mode stops at the row cap | 0.2 |
 | csv | Enrichment upload (CSV export is hand-written: one fixed schema) | 0.10 |
-| argon2, rand | Password hashing, tokens | 0.11 |
+| rand | View ids (random 64-bit) | 0.3 |
+| argon2 | Password hashing, tokens | 0.11 |
 | openidconnect or jsonwebtoken + reqwest (rustls) | OIDC SSO | 0.11 |
 | lettre | SMTP for alerts and reports | 0.9 |
 | reqwest (rustls) | Webhooks, GreptimeDB pipeline API | 0.9 |
 | cron | Cron schedules for alerts and reports | 0.9 |
+
+### Considered and not adopted
+
+| Option | Why not (evaluated 2026-10-31) | Revisit when |
+|---|---|---|
+| `greptimedb-ingester` 0.19, GreptimeDB's official Rust SDK (Apache-2.0) | gRPC on port 4001 and ingestion-focused: insert and bulk streaming, no SQL query API in its source. It adds about 106 crates on top of grepui's 168 (Arrow, tonic, prost). Reads and the small state writes are served by `sqlx` over the MySQL protocol, GreptimeDB's recommended query path, with bound parameters. For the playground it would write raw rows into tables of our own design, losing the real OTLP-created tables and the `_services`/`_operations` tables the demo wants | grepui needs high-volume writes (alert history at scale, an ingest proxy): none is planned |
+| `reqwest` / hyper client | The playground needs one plain-HTTP POST; the 40-line client in `playground/http.rs` avoids a TLS dependency | something needs HTTPS or redirects (webhooks in v0.9) |
+| `opentelemetry-otlp` SDK for demo data | Heavy, and cannot set past timestamps; a hand-written protobuf encoder is small and tested | never likely |
 
 No Node, no npm, no JS framework: the UI is hand-written ES modules (ARCH 06 D7). A chart renderer is written in the repo (SVG/canvas) unless a vendored, licence-checked library is added with an ADR.
 

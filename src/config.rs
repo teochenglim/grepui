@@ -32,6 +32,9 @@ pub struct Config {
     /// Logs table of the default org.
     #[arg(long, env = "GREPUI_LOGS_TABLE", default_value = "opentelemetry_logs")]
     pub logs_table: String,
+    /// Database holding grepui's own state (saved views, history); created by `grepui migrate`.
+    #[arg(long, env = "GREPUI_META_DATABASE", default_value = "grepui")]
+    pub meta_database: String,
     /// Per-query timeout in seconds.
     #[arg(long, env = "GREPUI_QUERY_TIMEOUT_SECS", default_value_t = 30)]
     pub query_timeout_secs: u64,
@@ -45,6 +48,7 @@ impl Default for Config {
             greptime_http_public: "http://127.0.0.1:4000".into(),
             traces_table: "opentelemetry_traces".into(),
             logs_table: "opentelemetry_logs".into(),
+            meta_database: "grepui".into(),
             query_timeout_secs: 30,
         }
     }
@@ -76,9 +80,23 @@ impl Config {
             )
         })?;
         self.database()?;
+        ident(&self.meta_database).map_err(|_| {
+            anyhow::anyhow!(
+                "--meta-database {:?} is not a valid identifier",
+                self.meta_database
+            )
+        })?;
         if self.query_timeout_secs == 0 || self.query_timeout_secs > 600 {
             anyhow::bail!("--query-timeout-secs must be between 1 and 600");
         }
         Ok(())
     }
+}
+
+/// The same server with `/public` as the database: it always exists, so it works before the
+/// org or metadata database has been created (migrate, playground).
+pub fn admin_url(mysql: &str) -> anyhow::Result<String> {
+    let mut u = url::Url::parse(mysql)?;
+    u.set_path("/public");
+    Ok(u.to_string())
 }

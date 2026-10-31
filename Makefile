@@ -26,6 +26,10 @@ build: ## Build the release binary into ./bin (the UI in web/static/ is embedded
 run: ## Run against a local GreptimeDB (make db-up && make seed first); UI on http://127.0.0.1:8080
 	cargo run -- serve
 
+.PHONY: migrate
+migrate: ## Create or upgrade grepui's own tables (saved views, history) in the local GreptimeDB (idempotent)
+	cargo run -- migrate --wait 30
+
 .PHONY: playground
 playground: ## Playground against a local GreptimeDB: seeds the `demo` database, trickles live demo traffic, serves :8080
 	cargo run -- playground --demo-data --wait 30 --greptime-mysql mysql://root@127.0.0.1:4002/demo

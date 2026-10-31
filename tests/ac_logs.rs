@@ -686,8 +686,11 @@ fn ac_0_2_6_sql_mode_accepts_reads() {
         "SHOW COLUMNS FROM opentelemetry_logs",
         "DESC TABLE opentelemetry_logs",
         "EXPLAIN SELECT * FROM opentelemetry_logs",
-        "TQL EVAL (0, 10, '1s') up",
-        "tql explain (0, 10, '1s') rate(x[5m])",
+        "SHOW TABLES FROM public",
+        "SHOW TABLES IN public",
+        "SHOW CREATE TABLE public.opentelemetry_logs",
+        "SHOW COLUMNS FROM opentelemetry_logs",
+        "DESC public.opentelemetry_logs",
     ] {
         assert_eq!(sqlmode::check(ok, DB), Ok(()), "{ok}");
     }
@@ -730,6 +733,26 @@ fn ac_0_2_6_sql_mode_rejects_writes() {
         "WITH x AS (SELECT 1) INSERT INTO t SELECT * FROM x",
         "EXPLAIN DELETE FROM t",
         "TQL DELETE x",
+        // TQL is refused outright: `__schema__` / `__database__` select another database.
+        "TQL EVAL (0, 10, '1s') up",
+        "tql explain (0, 10, '1s') rate(x[5m])",
+        "TQL EVAL (0, 10, '1s') m{__schema__=\"other\"}",
+        "  tql eval (0,1,'1s') m{__database__=\"other\"}",
+        "tql eval (0,1,'1s') {\"__sch\\u0065ma__\"=\"other\"}",
+        // Other-database SHOW/DESC variants (found by the security review).
+        "SHOW TABLES FROM other",
+        "SHOW TABLES IN other",
+        "SHOW FULL TABLES FROM other",
+        "SHOW TABLES FROM greptime.other",
+        "SHOW COLUMNS FROM t FROM other",
+        "SHOW COLUMNS FROM other.t",
+        "SHOW CREATE TABLE other.t",
+        "SHOW CREATE TABLE greptime.other.t",
+        "SHOW CREATE VIEW other.v",
+        "DESC other.t",
+        "DESC TABLE other.t",
+        "DESCRIBE other.t",
+        "SHOW CREATE TABLE information_schema.tables",
         "",
         "   ",
         "not sql at all",
@@ -801,6 +824,9 @@ async fn ac_0_2_6_sql_mode_caps_applied() {
         "SELECT%201%3B%20SELECT%202",
         "SELECT%20*%20FROM%20other.t",
         "SHOW%20DATABASES",
+        "SHOW%20TABLES%20FROM%20other",
+        "SHOW%20CREATE%20TABLE%20other.t",
+        "TQL%20EVAL%20(0%2C1%2C%271s%27)%20m",
     ] {
         let r = get(&a, &format!("{BASE}/sql?sql={bad}&{W}")).await;
         assert_eq!(r.status, StatusCode::BAD_REQUEST, "{bad}");
