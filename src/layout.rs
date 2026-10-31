@@ -188,7 +188,17 @@ pub fn waterfall(spans: &[SpanIn]) -> Waterfall {
         .into_iter()
         .map(|(i, depth)| {
             let s = &spans[i];
-            let (attributes, resource) = extract(&s.raw);
+            let (mut attributes, resource) = extract(&s.raw);
+            // Normalise first: the view counts a vector's dimensions before the panel loses it.
+            let mut llm = crate::llm::normalise(&attributes);
+            crate::llm::summarise_vectors(&mut attributes);
+            let from_events = crate::llm::event_evaluations(&s.raw["span_events"]);
+            if !from_events.is_empty() {
+                let v = llm.get_or_insert_with(|| json!({}));
+                let mut all = v["evaluations"].as_array().cloned().unwrap_or_default();
+                all.extend(from_events);
+                v["evaluations"] = Value::Array(all);
+            }
             let mut row = json!({
                 "span_id": s.span_id, "parent_id": s.parent_id, "depth": depth,
                 "service": s.service, "name": s.name, "kind": s.kind, "status": s.status, "error": s.is_error(),
@@ -198,6 +208,9 @@ pub fn waterfall(spans: &[SpanIn]) -> Waterfall {
                 "scope": s.raw["scope_name"],
                 "attributes": attributes, "resource": resource,
             });
+            if let Some(v) = llm {
+                row["llm"] = v;
+            }
             if let Some(e) = present(&s.raw["span_events"]) {
                 row["events"] = e;
             }

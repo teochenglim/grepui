@@ -83,6 +83,9 @@ fn mask(s: &Shared, org: &str, rows: &mut Value) -> Result<(), String> {
     if let Some(r) = rules {
         r.apply_value(rows, "viewer");
     }
+    // A report goes to people outside the app: prompts and completions are never in it whole.
+    let mode = super::llm::effective_mode(false, super::llm::content_mode(s, org), true);
+    crate::llm::protect(rows, mode);
     Ok(())
 }
 

@@ -50,6 +50,7 @@ pub async fn reload(s: &Shared, org: &Org) -> Result<(), ApiError> {
     if let Ok(mut m) = s.redact.write() {
         m.insert(org.name.clone(), Arc::new(Rules(rules)));
     }
+    super::llm::load_content_mode(s, &org.name).await;
     Ok(())
 }
 
@@ -166,9 +167,18 @@ pub async fn layer(State(s): State<Shared>, req: Request, next: Next) -> Respons
         }
         _ => role_of(&s, &template),
     };
-    let Some(rules) = rules.filter(|r| !r.is_empty_for(role)) else {
+    let rules = rules.filter(|r| !r.is_empty_for(role));
+    // Prompts and completions (R-AI8): the org's mode for anyone below admin; a public link never
+    // sees more than masked.
+    let public = template.contains("/public/");
+    let mode = super::llm::effective_mode(
+        role == "admin" && !public,
+        super::llm::content_mode(&s, &org),
+        public,
+    );
+    if rules.is_none() && mode == crate::llm::Mode::Visible {
         return res;
-    };
+    }
     let (mut parts, body) = res.into_parts();
     let Ok(bytes) = axum::body::to_bytes(body, MAX_BODY).await else {
         return (
@@ -182,10 +192,14 @@ pub async fn layer(State(s): State<Shared>, req: Request, next: Next) -> Respons
         Kind::Json => match serde_json::from_str::<Value>(&text) {
             Ok(mut v) => {
                 // The envelope's `meta` describes the query; only the data is masked.
-                match v.get_mut("data") {
-                    Some(d) => rules.apply_value(d, role),
-                    None => rules.apply_value(&mut v, role),
+                let target = match v.get_mut("data") {
+                    Some(d) => d,
+                    None => &mut v,
                 };
+                if let Some(r) = &rules {
+                    r.apply_value(target, role);
+                }
+                crate::llm::protect(target, mode);
                 v.to_string()
             }
             Err(_) => {
@@ -196,8 +210,35 @@ pub async fn layer(State(s): State<Shared>, req: Request, next: Next) -> Respons
                     .into_response();
             }
         },
-        Kind::Ndjson => rules.apply_ndjson(&text, role),
-        Kind::Csv => rules.apply_csv(&text, role),
+        Kind::Ndjson => {
+            let masked = match &rules {
+                Some(r) => r.apply_ndjson(&text, role),
+                None => text.to_string(),
+            };
+            if mode == crate::llm::Mode::Visible {
+                masked
+            } else {
+                masked
+                    .lines()
+                    .map(|l| match serde_json::from_str::<Value>(l) {
+                        Ok(mut v) => {
+                            crate::llm::protect(&mut v, mode);
+                            v.to_string()
+                        }
+                        Err(_) => l.to_string(),
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
+                    + "\n"
+            }
+        }
+        Kind::Csv => {
+            let masked = match &rules {
+                Some(r) => r.apply_csv(&text, role),
+                None => text.to_string(),
+            };
+            crate::llm::protect_csv(&masked, mode)
+        }
     };
     parts.headers.remove(header::CONTENT_LENGTH);
     parts

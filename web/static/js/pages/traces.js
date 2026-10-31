@@ -9,6 +9,7 @@ import { currentQuery, href, navigate, replaceQuery } from '../router.js';
 import { timeWindow } from '../state.js';
 import { h, mount } from '../util/dom.js';
 import { fmtNum, fmtTime, fmtUs, serviceColor } from '../util/format.js';
+import { kindBadge } from '../components/llmspan.js';
 
 const PAGE = 50;
 
@@ -83,9 +84,13 @@ export async function tracesPage(view) {
   });
 
   // Which attribute layout the table has: JSON tables (trace v2, LLM data) accept any attribute name in the filter.
+  const kinds = h('div', { class: 'row wrap', hidden: true });
+  const KINDS = ['LLM', 'AGENT', 'CHAIN', 'TOOL', 'RETRIEVER', 'RERANKER', 'EMBEDDING', 'GUARDRAIL', 'EVALUATOR'];
+  const setKind = (k) => { const rest = st.q.split(/\s+/).filter((t) => t && !t.startsWith('openinference.span.kind=')); st.q = [...rest, ...(k ? [`openinference.span.kind=${k}`] : [])].join(' '); bar.setQuery?.(st.q); sync(); load(); };
+  mount(kinds, h('span', { class: 'muted' }, 'Span kind'), KINDS.map((k) => h('button', { type: 'button', class: 'ghost kind-chip', onclick: () => setKind(k) }, kindBadge(k))), h('button', { type: 'button', class: 'ghost', onclick: () => setKind(null) }, 'any'));
   const layoutBadge = h('span', { class: 'badge', hidden: true });
-  api.get('traces/layout').then(({ data }) => { if (data.layout === 'json') { mount(layoutBadge, 'JSON attributes (trace v2)'); layoutBadge.title = 'Filter on any attribute, e.g. llm.model_name=gpt-4o or openinference.span.kind=TOOL'; layoutBadge.hidden = false; } }).catch(() => {});
-  mount(view, h('div', { class: 'page-head' }, h('h2', null, 'Traces'), h('span', { class: 'sub' }, 'one row per trace'), layoutBadge), bar.el, h('div', { class: 'grid2' }, histBox, scatBox), results);
+  api.get('traces/layout').then(({ data }) => { if (data.layout === 'json') { mount(layoutBadge, 'JSON attributes (trace v2)'); layoutBadge.title = 'Filter on any attribute, e.g. llm.model_name=gpt-4o or openinference.span.kind=TOOL'; layoutBadge.hidden = false; kinds.hidden = false; } }).catch(() => {});
+  mount(view, h('div', { class: 'page-head' }, h('h2', null, 'Traces'), h('span', { class: 'sub' }, 'one row per trace'), layoutBadge), bar.el, kinds, h('div', { class: 'grid2' }, histBox, scatBox), results);
   load();
   void navigate;
 }

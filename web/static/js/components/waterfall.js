@@ -2,6 +2,7 @@
 
 import { h } from '../util/dom.js';
 import { fmtUs, serviceColor } from '../util/format.js';
+import { kindBadge } from './llmspan.js';
 
 export function waterfall(spans, totalUs, onSelect) {
   const total = Math.max(1, totalUs);
@@ -12,7 +13,7 @@ export function waterfall(spans, totalUs, onSelect) {
     const row = h('div', { class: `wf-row${s.error ? ' err' : ''}`, tabindex: '0', role: 'button', 'aria-label': `${s.service} ${s.name} ${fmtUs(s.duration_us)}` },
       h('div', { class: 'wf-label', style: `padding-left:${s.depth * 14 + 6}px` },
         h('span', { class: 'dot', style: `background:${serviceColor(s.service)}` }),
-        h('strong', null, s.service), h('span', { class: 'muted clip' }, s.name)),
+        h('strong', null, s.service), kindBadge(s.llm && s.llm.kind), h('span', { class: 'muted clip' }, s.name)),
       h('div', { class: 'wf-track' },
         h('div', { class: 'wf-bar', style: `left:${left}%;width:${width}%;background:${s.error ? 'var(--bad)' : serviceColor(s.service)}` }),
         h('span', { class: 'wf-dur', style: left > 70 ? `right:${100 - left}%` : `left:${left + width}%` }, fmtUs(s.duration_us))));

@@ -155,4 +155,5 @@ Status: `planned` (requirement ID and release; a row whose release is `ready` or
 | Long ranges | Automatic rollup planner that reports its `source` | 0.7 |
 | Safety | Typed API with caps, parser-validated SQL mode, write allowlist test, dashboards with bound variables | 0.1 to 0.8 |
 | Enterprise tier | RBAC, SSO, audit, work groups, federation in the Apache-2.0 binary | 0.11, 0.12 |
+| LLM traces | OpenInference and `gen_ai.*` read natively: transcript, tool calls, documents, cost, evaluations, feedback and an agent graph in the Apache-2.0 binary; prompts masked below admin | 0.14, 0.15 |
 | Operations | One dependency (GreptimeDB), leader lease, no second datastore | 0.9, 0.13 |

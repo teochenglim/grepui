@@ -132,6 +132,8 @@ const ADMIN_MUTATING: &[&str] = &[
     "/branding",
     "/workgroups",
     "/reports",
+    "/llm/prices",
+    "/llm/content",
 ];
 /// Paths whose reads need an org admin (they show people, secrets or rules).
 const ADMIN_READING: &[&str] = &[

@@ -326,6 +326,8 @@ async fn live_apps() -> (
             Config {
                 greptime_mysql: url.clone(),
                 traces_table: table.into(),
+                // An admin reads prompts whole; viewers get them masked (ADR 0016).
+                admin_writes: true,
                 ..Config::default()
             },
             r.clone(),

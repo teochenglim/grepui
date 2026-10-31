@@ -58,7 +58,7 @@ export function serviceMap({ nodes, edges, width, height }, onOpen) {
   }
   for (const n of nodes) {
     const g = el('g', { class: 'node', tabindex: '0', role: 'link', 'aria-label': `Open service ${n.id}`, transform: `translate(${n.x},${n.y})` });
-    g.append(el('rect', { width: NODE_W, height: NODE_H, rx: 8, class: 'node-box', style: `stroke:${serviceColor(n.id)}` }), el('text', { x: 12, y: 19, class: 'node-name' }, n.id.length > 18 ? `${n.id.slice(0, 17)}…` : n.id), el('text', { x: 12, y: 35, class: 'node-sub' }, `${fmtNum(n.calls_in)} in · ${fmtNum(n.calls_out)} out`));
+    g.append(el('rect', { width: NODE_W, height: NODE_H, rx: 8, class: 'node-box', style: `stroke:${serviceColor(n.id)}` }), el('text', { x: 12, y: 19, class: 'node-name' }, (n.label || n.id).length > 18 ? `${(n.label || n.id).slice(0, 17)}…` : (n.label || n.id)), el('text', { x: 12, y: 35, class: 'node-sub' }, `${fmtNum(n.calls_in)} in · ${fmtNum(n.calls_out)} out`));
     g.append(el('title', {}, n.id));
     g.addEventListener('click', () => onOpen(n.id));
     g.addEventListener('keydown', (ev) => ev.key === 'Enter' && onOpen(n.id));

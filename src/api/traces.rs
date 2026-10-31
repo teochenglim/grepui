@@ -267,6 +267,22 @@ async fn load(
     Ok((spans, truncated, meta))
 }
 
+/// Fill missing costs from the price table and summarise the LLM spans of a trace; `(has_llm,
+/// summary)`. A price table that cannot be read leaves costs as reported.
+async fn llm_views(s: &Shared, org: &Org, rows: &mut [Value]) -> (bool, Value) {
+    if !rows.iter().any(|r| r.get("llm").is_some()) {
+        return (false, Value::Null);
+    }
+    let prices = super::llm::prices(s, &org.name).await.unwrap_or_default();
+    for r in rows.iter_mut() {
+        if let Some(v) = r.get_mut("llm") {
+            crate::llm::estimate_cost(v, &prices);
+        }
+    }
+    let views: Vec<&Value> = rows.iter().filter_map(|r| r.get("llm")).collect();
+    (true, crate::llm::trace_summary(&views))
+}
+
 pub async fn detail(
     State(s): State<Shared>,
     Path((org, id)): Path<(String, String)>,
@@ -276,7 +292,8 @@ pub async fn detail(
     let w = trace_window(&s, &p)?;
     let org = s.org(&org)?;
     let (spans, truncated, meta) = load(&s, org, &id, w).await?;
-    let wf = layout::waterfall(&spans);
+    let mut wf = layout::waterfall(&spans);
+    let (llm, summary) = llm_views(&s, org, &mut wf.rows).await;
     let mut services: Vec<&str> = spans.iter().map(|x| x.service.as_str()).collect();
     services.sort_unstable();
     services.dedup();
@@ -284,8 +301,44 @@ pub async fn detail(
         "trace_id": id, "start_ms": wf.start_ns / 1_000_000, "start_ns": wf.start_ns.to_string(),
         "duration_us": (wf.end_ns - wf.start_ns) / 1000, "spans": spans.len(),
         "services": services, "errors": spans.iter().filter(|x| x.is_error()).count(), "truncated": truncated,
+        "llm": llm.then_some(summary),
     });
     Ok(ok(json!({"trace": trace, "spans": wf.rows}), meta))
+}
+
+/// The agent graph of one trace (R-AI9): agents, tools and model calls with the edges between them.
+pub async fn agent_graph(
+    State(s): State<Shared>,
+    Path((org, id)): Path<(String, String)>,
+    Query(p): Query<TraceParams>,
+) -> Result<Response, ApiError> {
+    let id = traces::trace_id(&id)?;
+    let w = trace_window(&s, &p)?;
+    let org = s.org(&org)?;
+    let (spans, truncated, meta) = load(&s, org, &id, w).await?;
+    let mut wf = layout::waterfall(&spans);
+    llm_views(&s, org, &mut wf.rows).await;
+    let mut g = crate::agent_graph::build(&wf.rows);
+    let edges: Vec<layout::EdgeIn> = g["edges"]
+        .as_array()
+        .map(|l| {
+            l.iter()
+                .map(|e| layout::EdgeIn {
+                    from: e["from"].as_str().unwrap_or_default().to_string(),
+                    to: e["to"].as_str().unwrap_or_default().to_string(),
+                    calls: e["calls"].as_i64().unwrap_or(0),
+                    errors: e["errors"].as_i64().unwrap_or(0),
+                    avg_us: 0.0,
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    // Positions for the drawing (the service map's layered layout); a lone step has no edge, so
+    // the page also lists every node in a table.
+    g["map"] = layout::graph(&edges, true);
+    g["trace_id"] = json!(id);
+    g["truncated"] = json!(truncated);
+    Ok(ok(g, meta))
 }
 
 pub async fn flame(

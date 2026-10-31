@@ -7,7 +7,7 @@ import { copyText, h, mount } from '../util/dom.js';
 import { fmtTime } from '../util/format.js';
 import { session, state } from '../state.js';
 
-const TABS = [['members', 'Members'], ['tokens', 'API tokens'], ['queries', 'Queries'], ['groups', 'Work groups'], ['audit', 'Audit'], ['branding', 'Branding']];
+const TABS = [['members', 'Members'], ['tokens', 'API tokens'], ['queries', 'Queries'], ['groups', 'Work groups'], ['llm', 'LLM'], ['audit', 'Audit'], ['branding', 'Branding']];
 const ROLES = ['viewer', 'editor', 'admin'];
 const sel = (opts, v, label) => h('select', { 'aria-label': label }, opts.map((o) => h('option', { value: o, selected: o === v || null }, o)));
 
@@ -61,6 +61,23 @@ export async function adminPage(view, _p, tab = 'members') {
             await load(true);
           } catch (e) { say(e.message, 'warn'); }
         } }, 'Create token')));
+    },
+    async llm() {
+      const [{ data: prices }, { data: content }] = await Promise.all([api.get('llm/prices'), api.get('llm/content')]);
+      const model = h('input', { placeholder: 'model name, e.g. gpt-4o', 'aria-label': 'Model' });
+      const prompt = h('input', { type: 'number', min: '0', step: 'any', placeholder: 'prompt $ per 1M tokens', 'aria-label': 'Prompt price per million tokens', style: 'width:200px' });
+      const completion = h('input', { type: 'number', min: '0', step: 'any', placeholder: 'completion $ per 1M tokens', 'aria-label': 'Completion price per million tokens', style: 'width:220px' });
+      const mode = sel(['masked', 'hidden', 'visible'], content.mode, 'Prompt and completion text for people below admin');
+      mode.addEventListener('change', () => act(() => api.send('PUT', 'llm/content', { mode: mode.value })));
+      mount(out,
+        h('div', { class: 'card stack' }, h('h3', null, 'Prompts and completions'),
+          h('p', { class: 'muted' }, 'What editors and viewers (and anyone on a public link) see of message text, tool arguments and document text. Admins always see it. masked shows the length only; hidden removes it; visible shows it to signed-in members (public links stay masked).'),
+          h('div', { class: 'row' }, mode)),
+        h('div', { class: 'card stack' }, h('h3', null, 'Model prices'),
+          h('p', { class: 'muted' }, 'Used only for spans that report no cost of their own (llm.cost.total). Dollars per million tokens. Estimated costs are marked ≈.'),
+          dataTable({ columns: [{ key: 'model', label: 'Model' }, { key: 'prompt_per_1m', label: 'Prompt $/1M', num: true }, { key: 'completion_per_1m', label: 'Completion $/1M', num: true },
+            { key: 'x', label: '', render: (p) => h('button', { type: 'button', class: 'ghost', onclick: () => act(() => api.send('DELETE', `llm/prices?model=${encodeURIComponent(p.model)}`)) }, 'Remove') }], rows: prices, empty: 'No prices set.' }),
+          h('div', { class: 'row' }, model, prompt, completion, h('button', { class: 'primary', type: 'button', onclick: () => act(() => api.send('PUT', 'llm/prices', { model: model.value, prompt_per_1m: Number(prompt.value), completion_per_1m: Number(completion.value) })) }, 'Save price'))));
     },
     async queries() {
       const { data } = await api.get('queries');

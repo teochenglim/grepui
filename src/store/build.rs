@@ -444,6 +444,10 @@ pub const ITEM_KINDS: &[&str] = &[
     // v0.13.0: scheduled reports and what the last run of each did.
     "report",
     "reportstate",
+    // v0.15.0: per-model prices for LLM cost, and human feedback on traces and spans.
+    "price",
+    "feedback",
+    "llmconf",
 ];
 
 fn item_kind(kind: &str) -> Result<Bind> {

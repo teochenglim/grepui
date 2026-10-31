@@ -10,6 +10,7 @@ pub mod enrichment;
 pub mod functions;
 pub mod health;
 pub mod ingest;
+pub mod llm;
 pub mod logs;
 pub mod metrics;
 pub mod pipelines;
@@ -60,6 +61,8 @@ pub struct AppState {
     pub redact: std::sync::RwLock<HashMap<String, Arc<crate::redact::Rules>>>,
     /// `false` until the first load at startup: data responses wait rather than leak.
     pub redact_ready: std::sync::atomic::AtomicBool,
+    /// Per org: what roles below admin see of LLM prompts and completions (refreshed with the redaction rules).
+    pub llm_content: std::sync::RwLock<HashMap<String, crate::llm::Mode>>,
     /// Sessions, tokens and rate limits in memory (ADR 0012).
     pub auth: crate::auth::AuthState,
     /// Audit rows waiting to be written.
@@ -160,6 +163,7 @@ impl AppState {
             sender,
             redact: Default::default(),
             redact_ready: std::sync::atomic::AtomicBool::new(true),
+            llm_content: Default::default(),
             auth: Default::default(),
             audit: Default::default(),
             workload,
@@ -480,6 +484,10 @@ pub const ROUTES: &[&str] = &[
     "/api/v1/orgs/{org}/reports/{id}/preview",
     "/api/v1/orgs/{org}/reports/{id}/run",
     "/api/v1/orgs/{org}/reports/{id}/history",
+    "/api/v1/orgs/{org}/llm/prices",
+    "/api/v1/orgs/{org}/llm/content",
+    "/api/v1/orgs/{org}/llm/feedback",
+    "/api/v1/orgs/{org}/traces/{id}/agent-graph",
     "/api/v1/orgs/{org}/workgroups",
     "/api/v1/orgs/{org}/workgroups/{role}",
     "/api/v1/orgs/{org}/queries",
@@ -569,6 +577,11 @@ pub const WRITE_ROUTES: &[(&str, &str)] = &[
     ("PUT", "/api/v1/orgs/{org}/reports/{id}"),
     ("DELETE", "/api/v1/orgs/{org}/reports/{id}"),
     ("POST", "/api/v1/orgs/{org}/reports/{id}/run"),
+    ("PUT", "/api/v1/orgs/{org}/llm/prices"),
+    ("DELETE", "/api/v1/orgs/{org}/llm/prices"),
+    ("PUT", "/api/v1/orgs/{org}/llm/content"),
+    ("PUT", "/api/v1/orgs/{org}/llm/feedback"),
+    ("DELETE", "/api/v1/orgs/{org}/llm/feedback"),
     ("PUT", "/api/v1/orgs/{org}/workgroups/{role}"),
     ("DELETE", "/api/v1/orgs/{org}/workgroups/{role}"),
     ("POST", "/api/v1/orgs/{org}/queries/{id}/cancel"),
@@ -904,6 +917,26 @@ pub fn router(state: Shared) -> Router {
         .route(
             "/api/v1/orgs/{org}/reports/{id}/history",
             get(reports::history),
+        )
+        .route(
+            "/api/v1/orgs/{org}/llm/prices",
+            get(llm::prices_list)
+                .put(llm::price_put)
+                .delete(llm::price_delete),
+        )
+        .route(
+            "/api/v1/orgs/{org}/llm/feedback",
+            get(llm::feedback_list)
+                .put(llm::feedback_put)
+                .delete(llm::feedback_delete),
+        )
+        .route(
+            "/api/v1/orgs/{org}/traces/{id}/agent-graph",
+            get(traces::agent_graph),
+        )
+        .route(
+            "/api/v1/orgs/{org}/llm/content",
+            get(llm::content_get).put(llm::content_put),
         )
         .route("/api/v1/orgs/{org}/workgroups", get(workload::groups_list))
         .route(

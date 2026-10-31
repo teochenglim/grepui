@@ -167,3 +167,22 @@ a.btn { display: inline-block; padding: 6px 12px; border-radius: var(--radius); 
 .login input { width: 100%; }
 .logo-img { width: 22px; height: 22px; border-radius: 5px; object-fit: contain; }
 .who { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; }
+
+/* LLM views (v0.15.0) */
+.badge.kind { text-transform: uppercase; letter-spacing: .03em; font-size: 10.5px; }
+.badge.k-llm { color: var(--accent); } .badge.k-agent { color: var(--info); } .badge.k-tool { color: var(--warn); }
+.badge.k-retr { color: var(--ok); } .badge.k-emb { color: var(--muted); } .badge.k-eval { color: var(--bad); }
+.row.wrap { flex-wrap: wrap; }
+.kind-chip { padding: 0 2px; }
+.llm-view { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.transcript { display: flex; flex-direction: column; gap: 6px; }
+.msg { border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 10px; background: var(--surface); }
+.msg.role-user { border-left: 3px solid var(--info); } .msg.role-assistant { border-left: 3px solid var(--accent); }
+.msg.role-system { border-left: 3px solid var(--muted); } .msg.role-tool { border-left: 3px solid var(--warn); }
+.msg-role { font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: .04em; }
+.llm-text { white-space: pre-wrap; word-break: break-word; max-height: 360px; overflow: auto; }
+.llm-text summary { cursor: pointer; color: var(--muted); }
+.tool-call { font-size: 12.5px; } .tool-call code { white-space: pre-wrap; word-break: break-all; }
+.doc { border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 10px; }
+.feedback { display: flex; flex-direction: column; gap: 6px; }
+.chip-static .muted { margin-right: 4px; }

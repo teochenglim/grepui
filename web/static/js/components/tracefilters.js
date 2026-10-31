@@ -31,5 +31,5 @@ export function traceFilters({ q, service, minMs, errors, onSubmit }) {
     if (service && !data.includes(service)) svc.append(h('option', { value: service, selected: true }, service));
   }).catch(() => {});
   const help = h('details', { class: 'help' }, h('summary', null, 'Syntax'), h('table', null, h('tbody', null, HELP.map(([c, d]) => h('tr', null, h('td', null, h('code', null, c)), h('td', { class: 'muted' }, d))))));
-  return { el: h('div', { class: 'filterbar' }, h('div', { class: 'row' }, input, svc, dur, h('label', { class: 'check' }, err, 'Errors only'), run), help), get };
+  return { el: h('div', { class: 'filterbar' }, h('div', { class: 'row' }, input, svc, dur, h('label', { class: 'check' }, err, 'Errors only'), run), help), get, setQuery: (v) => { input.value = v; } };
 }

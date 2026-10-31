@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 
 pub mod admin;
+pub mod agent_graph;
 pub mod alerts;
 pub mod api;
 pub mod audit;
@@ -15,6 +16,7 @@ pub mod error;
 pub mod functions;
 pub mod http;
 pub mod layout;
+pub mod llm;
 pub mod metrics;
 pub mod org;
 pub mod pipelines;

@@ -91,6 +91,14 @@ Parity with the reference platform is tracked in [07_parity_matrix.md](07_parity
 | R-O3 | Operate | Graceful shutdown, connection pool limits, and `--read-only-user` check at startup that warns if the DB account can write |
 | R-AI1 | LLM | The traces table layout (flat trace v1 or JSON2 trace v2) is detected, and filters, trace detail, histogram and scatter work on both; attribute keys are bound parameters |
 | R-AI2 | LLM | The Connect page tells LLM SDKs (OpenInference, OTel GenAI) how to send to a trace v2 table: headers, Python, environment and collector snippets, and the notes a user needs (separate table, privacy, size) |
+| R-AI3 | LLM | A normalised LLM view of a span is built from OpenInference and `gen_ai.*` attributes: kind, model, provider, tokens, cost, messages reassembled by index, tool calls, documents, embeddings without vectors; a price table fills missing cost |
+| R-AI4 | LLM | The trace page shows LLM spans: kind badges and kind filters, conversation transcript with tool calls, token and cost chips, retrieval documents, long values collapsed, a trace summary of calls, tokens and cost |
+| R-AI5 | LLM | LLM analytics over bounded windows: calls, tokens, cost, error rate and latency percentiles by model, provider, span kind and tool, with a time series, all on bound JSON paths |
+| R-AI6 | LLM | Sessions and users: sessions grouped by `session.id` or `gen_ai.conversation.id` with a turn-by-turn view, and users grouped by `user.id` |
+| R-AI7 | LLM | Annotations and evaluations are read from spans (`annotation.*`, `evaluation.*`, `gen_ai.evaluation.result`) and human feedback is stored per org in the state store and shown with the trace |
+| R-AI8 | LLM | Content protection: prompts, completions and tool arguments are masked or hidden by role through the redaction layer, and size caps apply to every LLM view and export |
+| R-AI9 | LLM | An agent graph is drawn from `graph.node.*`, `agent.name` and span parentage, with calls, errors and latency per node and edge |
+| R-AI10 | LLM | Alerts can use LLM metrics (cost, tokens, error rate, latency percentile) as a condition, per model or in total |
 | R-D1 | Delivery | `VERSION` is the single source; `Cargo.toml` matches; the binary reports it |
 | R-D2 | Delivery | The banned product name appears nowhere in the tree (`make no-banned-names`) |
 | R-D3 | Delivery | CI and release workflows pin every action to a commit SHA; release is tag-driven and the tag must equal `VERSION` |
