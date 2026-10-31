@@ -6,7 +6,7 @@ Feature-by-feature comparison with the reference all-in-one platform, built from
 
 **Edition.** `ent` = labelled enterprise-only in the docs (RBAC, SSO, extended retention, federated search, BYOB, cipher keys, query management, workload management, audit trail, anomaly-detection alerts). Everything else is unlabelled (not confirmed as open source). grepui ships all of its features under Apache-2.0.
 
-Status: `planned` (requirement ID and release), `differs` (planned, but deliberately different), `gap` (not planned, with the reason), `n/a`.
+Status: `planned` (requirement ID and release; a row whose release is `ready` or `shipped` in [RELEASE.md](../RELEASE.md) is built), `differs` (planned, but deliberately different), `gap` (not planned, with the reason), `n/a`.
 
 ## Logs
 

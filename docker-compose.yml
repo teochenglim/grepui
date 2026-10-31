@@ -1,4 +1,6 @@
-# GreptimeDB + grepui. Seed demo data afterwards with: python3 scripts/seed.py
+# GreptimeDB + grepui in playground mode: grepui waits for the database, seeds demo traces and
+# logs into the `demo` database (only when it is empty), keeps a trickle of live demo traffic
+# going, and serves on :8080. For a real deployment use `serve` (the image default) instead.
 services:
   greptimedb:
     image: greptime/greptimedb:v1.2.1
@@ -11,8 +13,11 @@ services:
   grepui:
     image: ${GREPUI_IMAGE:-ghcr.io/teochenglim/grepui:latest}
     build: .
+    command: ["playground", "--wait", "90", "--demo-data"]
     environment:
-      GREPTIME_MYSQL: mysql://root@greptimedb:4002/public
+      GREPTIME_MYSQL: mysql://root@greptimedb:4002/demo
+      # Where the playground writes demo data (compose-internal).
+      GREPTIME_HTTP: http://greptimedb:4000
       # The address collectors on the host use; shown on the Connect page.
       GREPTIME_HTTP_PUBLIC: http://127.0.0.1:4000
     ports: ["127.0.0.1:8080:8080"]

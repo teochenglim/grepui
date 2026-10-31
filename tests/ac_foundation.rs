@@ -250,7 +250,10 @@ fn ac_0_1_3_embedded_file_list_is_complete() {
 // ---- AC0.1.4 read-only by construction --------------------------------------
 
 fn fill(route: &str) -> String {
-    route.replace("{org}", "default").replace("{name}", "t")
+    route
+        .replace("{org}", "default")
+        .replace("{name}", "t")
+        .replace("{field}", "severity_text")
 }
 
 #[tokio::test]
@@ -294,16 +297,19 @@ fn ac_0_1_4_builders_are_read_only() {
             q.sql
         );
         assert!(!q.sql.contains(';'), "{}", q.sql);
-        for w in [
-            "INSERT ",
-            "UPDATE ",
-            "DELETE ",
-            "DROP ",
-            "ALTER ",
-            "CREATE ",
-            "TRUNCATE ",
-        ] {
-            assert!(!body.contains(w), "{} contains {w}", q.sql);
+        // `SHOW CREATE TABLE` is a read; every other statement must not mention a write verb.
+        if !body.starts_with("SHOW ") {
+            for w in [
+                "INSERT ",
+                "UPDATE ",
+                "DELETE ",
+                "DROP ",
+                "ALTER ",
+                "CREATE ",
+                "TRUNCATE ",
+            ] {
+                assert!(!body.contains(w), "{} contains {w}", q.sql);
+            }
         }
     }
 }

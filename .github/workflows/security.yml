@@ -1,0 +1,149 @@
+name: Security
+
+# SAST, dependency and container scanning. Findings go to the repository's Security tab
+# (SARIF) and fail the job on CRITICAL/HIGH. Same shape as teochenglim/cogent.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'   # weekly, Monday 6 AM UTC: new CVEs appear without code changes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Semgrep SAST ────────────────────────────────────────────────────────────
+  #
+  # Rust (the server), JavaScript (the embedded UI), Python (scripts/seed.py), SQL injection,
+  # secrets, OWASP Top 10, the Dockerfile and the GitHub workflows themselves.
+  # SEMGREP_APP_TOKEN is optional: set it in repo secrets to push results to Semgrep Cloud.
+  # Without it, findings are printed to the log and uploaded as SARIF.
+
+  semgrep:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # upload SARIF to the Security tab
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Scan
+        run: |
+          semgrep scan \
+            --config p/rust \
+            --config p/javascript \
+            --config p/python \
+            --config p/sql-injection \
+            --config p/secrets \
+            --config p/owasp-top-ten \
+            --config p/dockerfile \
+            --config p/github-actions \
+            --exclude target \
+            --sarif \
+            --output semgrep.sarif \
+            --error
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      - name: Upload SARIF to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4.36.3
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+  # ── Trivy: dependency + filesystem scan ─────────────────────────────────────
+  #
+  # Scans Cargo.lock and the repo for known CVEs. Fails on CRITICAL or HIGH.
+  # Complements `cargo audit` / `cargo deny` in ci.yml (different advisory sources).
+
+  trivy:
+    name: Trivy filesystem scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Scan filesystem (fail on CRITICAL/HIGH CVEs)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+
+      - name: Scan filesystem (SARIF, uploaded to the Security tab)
+        if: always()
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-fs.sarif
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+
+      - name: Upload SARIF to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4.36.3
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+
+  # ── Trivy: container image ──────────────────────────────────────────────────
+  #
+  # Builds the release image (not pushed) and scans the OS layer and the binary.
+  # Distroless keeps the OS surface small; this catches base-image CVEs between releases.
+
+  trivy-image:
+    name: Trivy image scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build image (local only, not pushed)
+        run: docker build --build-arg VERSION=security-scan -t grepui:scan .
+
+      - name: Scan image (fail on CRITICAL/HIGH CVEs)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: grepui:scan
+          format: table
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Scan image (SARIF, uploaded to the Security tab)
+        if: always()
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: grepui:scan
+          format: sarif
+          output: trivy-image.sarif
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Upload SARIF to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4.36.3
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image

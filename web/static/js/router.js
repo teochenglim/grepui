@@ -41,7 +41,7 @@ export function refresh() {
 
 async function render() {
   const { parts, query } = parseHash();
-  if (parts.length === 0) return navigate('streams');
+  if (parts.length === 0) return navigate('logs');
   state.org = parts[0];
   const r = query.get('range');
   if (r && RANGES[r]) state.range = r;
@@ -68,3 +68,15 @@ export function start(el, h) {
 }
 
 export const section = () => parseHash().parts[1] || 'streams';
+export const currentQuery = () => parseHash().query;
+
+/** Update query-string parameters in the URL without re-rendering (shareable links). */
+export function replaceQuery(obj) {
+  const { parts, query } = parseHash();
+  for (const [k, v] of Object.entries(obj)) {
+    if (v == null || v === '') query.delete(k);
+    else query.set(k, v);
+  }
+  const qs = query.toString();
+  history.replaceState(null, '', `#/${parts.map(encodeURIComponent).join('/')}${qs ? `?${qs}` : ''}`);
+}

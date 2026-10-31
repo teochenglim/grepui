@@ -64,11 +64,39 @@ pub fn sample_db(q: &Q) -> Result<Vec<Value>, ReadError> {
         "stream_stats" => vec![
             json!({"total": 1499, "oldest": 1_760_000_000_000i64, "newest": 1_760_003_600_000i64}),
         ],
+        "logs_ddl" => vec![json!({"Table": "opentelemetry_logs", "Create Table": FULLTEXT_DDL})],
+        "logs_search" | "logs_record" => vec![log_row(
+            "1793399269857388008",
+            "ERROR",
+            "Refund failed: upstream timeout in 29 ms",
+        )],
+        "logs_around" => vec![
+            log_row("1793399269857388000", "INFO", "before"),
+            log_row("1793399269857388008", "ERROR", "pivot"),
+        ],
+        "logs_histogram" => vec![
+            json!({"bucket_ms": 1_793_399_100_000i64, "n": 45}),
+            json!({"bucket_ms": 1_793_399_400_000i64, "n": 194}),
+        ],
+        "logs_top_values" => vec![
+            json!({"value": "INFO", "n": 90}),
+            json!({"value": "ERROR", "n": 10}),
+        ],
+        "sql_mode" => vec![json!({"b": 1, "a": 2})],
         "stream_sample" => {
             vec![json!({"timestamp": 1_760_003_600_000i64, "service_name": "cart", "body": "ok"})]
         }
         _ => vec![],
     })
+}
+
+pub const FULLTEXT_DDL: &str = "CREATE TABLE IF NOT EXISTS `opentelemetry_logs` (\n  `timestamp` TIMESTAMP(9) NOT NULL,\n  `body` STRING NULL FULLTEXT INDEX WITH(analyzer = 'English'),\n  TIME INDEX (`timestamp`)\n)";
+pub const PLAIN_DDL: &str = "CREATE TABLE IF NOT EXISTS `opentelemetry_logs` (\n  `timestamp` TIMESTAMP(9) NOT NULL,\n  `body` STRING NULL,\n  TIME INDEX (`timestamp`)\n)";
+
+pub fn log_row(ts_ns: &str, level: &str, body: &str) -> Value {
+    json!({"timestamp": 1_793_399_269_857i64, "ts_ns": ts_ns, "severity_text": level, "severity_number": 17, "body": body,
+           "trace_id": "f1ebd7ef1a8ecefd2ce38517da7e7234", "span_id": "e3586378d5b65d18", "scope_name": "demo",
+           "log_attributes": {"http.method": "POST"}, "resource_attributes": {"service.name": "payment"}})
 }
 
 pub fn app_with(cfg: Config, reader: Arc<dyn Reader>) -> Router {

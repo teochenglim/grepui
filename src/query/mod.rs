@@ -2,7 +2,10 @@
 //! a [`Reader`] runs it. Nothing from a request is ever formatted into SQL text (R-Q1).
 
 pub mod build;
+pub mod filter;
+pub mod logs;
 pub mod reader;
+pub mod sqlmode;
 
 use crate::error::{ApiError, ReadError};
 use async_trait::async_trait;
@@ -59,6 +62,14 @@ impl Q {
 pub trait Reader: Send + Sync {
     /// Rows as JSON objects keyed by column alias.
     async fn fetch(&self, q: &Q) -> Result<Vec<Value>, ReadError>;
+
+    /// At most `max` rows. Implementations that can should stop reading early; the default
+    /// fetches everything and truncates.
+    async fn fetch_max(&self, q: &Q, max: usize) -> Result<Vec<Value>, ReadError> {
+        let mut rows = self.fetch(q).await?;
+        rows.truncate(max);
+        Ok(rows)
+    }
 }
 
 /// "Show SQL" (R-Q4): what ran, how long it took, how many rows, and where the data came from.
@@ -70,6 +81,9 @@ pub struct Meta {
     pub ms: u64,
     pub rows: usize,
     pub source: &'static str,
+    /// Something the user should know about how the answer was produced (e.g. a fallback).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
 }
 
 /// Run a query and return rows with their [`Meta`].
@@ -83,6 +97,27 @@ pub async fn run(reader: &dyn Reader, q: Q) -> Result<(Vec<Value>, Meta), ReadEr
         ms: t.elapsed().as_millis() as u64,
         rows: rows.len(),
         source: "raw",
+        note: None,
+    };
+    Ok((rows, meta))
+}
+
+/// Like [`run`] but reads at most `max` rows.
+pub async fn run_max(
+    reader: &dyn Reader,
+    q: Q,
+    max: usize,
+) -> Result<(Vec<Value>, Meta), ReadError> {
+    let t = Instant::now();
+    let rows = reader.fetch_max(&q, max).await?;
+    let meta = Meta {
+        query: q.name.to_string(),
+        sql: q.sql.clone(),
+        binds: q.binds.iter().map(Bind::show).collect(),
+        ms: t.elapsed().as_millis() as u64,
+        rows: rows.len(),
+        source: "raw",
+        note: None,
     };
     Ok((rows, meta))
 }
@@ -118,6 +153,16 @@ impl Window {
         to: Option<i64>,
         limit: Option<u32>,
     ) -> Result<Window, ApiError> {
+        Self::parse_max(from, to, limit, MAX_LIMIT)
+    }
+
+    /// Like [`Window::parse`] with a larger row cap (exports).
+    pub fn parse_max(
+        from: Option<i64>,
+        to: Option<i64>,
+        limit: Option<u32>,
+        max: u32,
+    ) -> Result<Window, ApiError> {
         let (Some(from_ms), Some(to_ms)) = (from, to) else {
             return Err(ApiError::bad(
                 "from and to are required (epoch milliseconds)",
@@ -132,7 +177,7 @@ impl Window {
         Ok(Window {
             from_ms,
             to_ms,
-            limit: limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT),
+            limit: limit.unwrap_or(DEFAULT_LIMIT).clamp(1, max),
         })
     }
 }

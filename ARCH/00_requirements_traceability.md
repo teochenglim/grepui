@@ -10,7 +10,7 @@ UI behaviour is checked by API-level tests plus a recorded manual/browser pass p
 
 Parity with the reference platform is tracked in [07_parity_matrix.md](07_parity_matrix.md); every "planned" row there points at an ID below.
 
-77 requirements, 80 acceptance criteria.
+78 requirements, 81 acceptance criteria.
 
 | ID | Area | Requirement |
 |---|---|---|
@@ -32,7 +32,8 @@ Parity with the reference platform is tracked in [07_parity_matrix.md](07_parity
 | R-L4 | Logs | Source details for one record, and Search Around: N neighbouring records in storage order, ignoring the original filters |
 | R-L5 | Logs | SQL mode: exactly one read-only statement (SELECT, WITH, SHOW, DESC, TQL, EXPLAIN) validated by a SQL parser, with row cap, window macros, timeout |
 | R-L6 | Logs | Full-text search over `body` using GreptimeDB's term matching, with a documented fallback when the fulltext index is absent |
-| R-L7 | Logs | Export of the current result as CSV or NDJSON, capped, streamed |
+| R-L7 | Logs | Export of the current result as CSV or NDJSON, capped at 10 000 rows; spreadsheet formulas in text cells are defused |
+| R-G1 | Demo | Playground mode: `grepui playground --demo-data` waits for GreptimeDB, seeds deterministic demo traces and logs through GreptimeDB's OTLP endpoint, and keeps a trickle of live demo traffic going. It writes only to a database named `demo` or `demo_*`, only when it has no traces, and only from this command: `serve` has no ingest path (ADR 0005) |
 | R-S1 | State | `grepui migrate` creates and upgrades the `grepui_*` metadata tables idempotently; the binary refuses to start against a newer schema |
 | R-S2 | State | Saved views: store, list, rename, delete, share by id; a view restores query, window and columns |
 | R-S3 | State | Query history per user with caps and retention; one-click rerun |

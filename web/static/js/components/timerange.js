@@ -1,4 +1,4 @@
-import { refresh } from '../router.js';
+import { refresh, replaceQuery } from '../router.js';
 import { RANGES, state } from '../state.js';
 import { h } from '../util/dom.js';
 
@@ -10,8 +10,7 @@ export function timeRange() {
   );
   sel.addEventListener('change', () => {
     state.range = sel.value;
-    const parts = location.hash.replace(/^#/, '').split('?')[0];
-    location.hash = `${parts}${state.range === '1h' ? '' : `?range=${state.range}`}`;
+    replaceQuery({ range: state.range === '1h' ? null : state.range });
     refresh();
   });
   return sel;

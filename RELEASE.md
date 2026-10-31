@@ -2,7 +2,7 @@
 
 The single place to see where grepui stands: what is shipped, what is planned, what each release proves, and how a release is cut. Per-release detail (scope, acceptance criteria, named tests, checklist) lives in [`RELEASE/vX.Y.Z.md`](RELEASE/README.md); this file is the readable roll-up and the changelog.
 
-> **Current state:** v0.1.0 is **ready** (code, tests and docs done; the commit, tag and release are the owner's step). No tag has been pushed, so nothing is published. v0.2.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
+> **Current state:** v0.1.0 and v0.2.0 are **ready** (code, tests and docs done; the commits, tags and releases are the owner's step). No tag has been pushed, so nothing is published. v0.3.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
 
 ## 1. Summary
 
@@ -14,29 +14,31 @@ grepui is a multi-tenant observability UI for GreptimeDB: one Rust binary (axum)
 | Pinned GreptimeDB | `v1.2.1` (`GREPTIME_VERSION` in the Makefile) |
 | Tenancy | Multi-tenant from v0.1.0: org-scoped routes; orgs map to GreptimeDB databases |
 | Releases planned | 14 (v0.1.0 to v0.13.0, then v1.0.0) |
-| Requirements | 77 (`ARCH/00_requirements_traceability.md`) |
-| Acceptance criteria | 80, each governed by at least two named tests (`make ac-map`) |
+| Requirements | 78 (`ARCH/00_requirements_traceability.md`) |
+| Acceptance criteria | 81, each governed by at least two named tests (`make ac-map`) |
 | Licence | Apache-2.0 |
 | Artifacts per tag | tarballs for linux and macOS on amd64 and arm64 (with `.sha256`), multi-arch image on GHCR, GitHub Release with the notes from `RELEASE/<tag>.md` |
 
 ## 2. Release status
 
+Latest built: **v0.2.0: Logs and playground** (ready). Newest first.
+
 | Release | Theme | Status | ACs | Requirements covered |
 |---|---|---|---|---|
-| [v0.1.0](RELEASE/v0.1.0.md) | Foundation | ready | 13 | R-D1 R-D2 R-D3 R-F1 R-F2 R-F3 R-F4 R-F5 R-I1 R-Q1 R-Q2 R-Q3 R-Q4 R-T1 |
-| [v0.2.0](RELEASE/v0.2.0.md) | Logs | planned | 8 | R-L1 R-L2 R-L3 R-L4 R-L5 R-L6 R-L7 R-Q1 |
-| [v0.3.0](RELEASE/v0.3.0.md) | State, saved views and stream health | planned | 6 | R-F4 R-I2 R-S1 R-S2 R-S3 R-S4 R-S5 |
-| [v0.4.0](RELEASE/v0.4.0.md) | Traces | planned | 6 | R-R1 R-R2 R-R3 R-R4 R-R5 R-R6 |
-| [v0.5.0](RELEASE/v0.5.0.md) | Services and service map | planned | 4 | R-V1 R-V2 R-V3 R-V4 |
-| [v0.6.0](RELEASE/v0.6.0.md) | Metrics | planned | 2 | R-M1 R-M2 |
-| [v0.7.0](RELEASE/v0.7.0.md) | Rollups and extended retention | planned | 4 | R-F4 R-P1 R-P2 R-P3 R-X1 |
-| [v0.8.0](RELEASE/v0.8.0.md) | Dashboards | planned | 6 | R-B1 R-B2 R-B3 R-B4 R-B5 R-B6 |
-| [v0.9.0](RELEASE/v0.9.0.md) | Alerts and incidents | planned | 8 | R-A1 R-A2 R-A3 R-A4 R-A5 R-A6 R-A7 R-A8 |
-| [v0.10.0](RELEASE/v0.10.0.md) | Pipelines, functions, enrichment, redaction | planned | 4 | R-F4 R-N1 R-N2 R-N3 R-N4 |
-| [v0.11.0](RELEASE/v0.11.0.md) | Access control, multi-tenancy, SSO and audit | planned | 7 | R-C1 R-C2 R-C3 R-C4 R-C5 R-C6 |
-| [v0.12.0](RELEASE/v0.12.0.md) | Query management, work groups and federation | planned | 5 | R-W1 R-W2 R-W3 R-Y1 R-Y2 |
-| [v0.13.0](RELEASE/v0.13.0.md) | Reports, RUM view and operate | planned | 5 | R-E1 R-O1 R-O2 R-O3 R-U1 |
 | [v1.0.0](RELEASE/v1.0.0.md) | Launch hardening | planned | 2 | R-C2 R-F4 R-Q1 |
+| [v0.13.0](RELEASE/v0.13.0.md) | Reports, RUM view and operate | planned | 5 | R-E1 R-O1 R-O2 R-O3 R-U1 |
+| [v0.12.0](RELEASE/v0.12.0.md) | Query management, work groups and federation | planned | 5 | R-W1 R-W2 R-W3 R-Y1 R-Y2 |
+| [v0.11.0](RELEASE/v0.11.0.md) | Access control, multi-tenancy, SSO and audit | planned | 7 | R-C1 R-C2 R-C3 R-C4 R-C5 R-C6 |
+| [v0.10.0](RELEASE/v0.10.0.md) | Pipelines, functions, enrichment, redaction | planned | 4 | R-F4 R-N1 R-N2 R-N3 R-N4 |
+| [v0.9.0](RELEASE/v0.9.0.md) | Alerts and incidents | planned | 8 | R-A1 R-A2 R-A3 R-A4 R-A5 R-A6 R-A7 R-A8 |
+| [v0.8.0](RELEASE/v0.8.0.md) | Dashboards | planned | 6 | R-B1 R-B2 R-B3 R-B4 R-B5 R-B6 |
+| [v0.7.0](RELEASE/v0.7.0.md) | Rollups and extended retention | planned | 4 | R-F4 R-P1 R-P2 R-P3 R-X1 |
+| [v0.6.0](RELEASE/v0.6.0.md) | Metrics | planned | 2 | R-M1 R-M2 |
+| [v0.5.0](RELEASE/v0.5.0.md) | Services and service map | planned | 4 | R-V1 R-V2 R-V3 R-V4 |
+| [v0.4.0](RELEASE/v0.4.0.md) | Traces | planned | 6 | R-R1 R-R2 R-R3 R-R4 R-R5 R-R6 |
+| [v0.3.0](RELEASE/v0.3.0.md) | State, saved views and stream health | planned | 6 | R-F4 R-I2 R-S1 R-S2 R-S3 R-S4 R-S5 |
+| [v0.2.0](RELEASE/v0.2.0.md) | Logs and playground | ready | 9 | R-G1 R-L1 R-L2 R-L3 R-L4 R-L5 R-L6 R-L7 R-Q1 |
+| [v0.1.0](RELEASE/v0.1.0.md) | Foundation | ready | 13 | R-D1 R-D2 R-D3 R-F1 R-F2 R-F3 R-F4 R-F5 R-I1 R-Q1 R-Q2 R-Q3 R-Q4 R-T1 |
 
 Status vocabulary: `planned` (ACs written, no code) → `in progress` (tests being written, gate counts them) → `ready` (`make check` green locally, tag run pending, user releases) → `shipped` (tag pushed, CI green, release published).
 
@@ -58,6 +60,20 @@ Newest first. An entry is written when a release becomes `ready`; the same text 
 ### Unreleased
 
 - Requirements, architecture, positioning and parity matrix (ARCH 00–07), release plan with ACs for v0.1.0–v1.0.0, `scripts/seed.py` (demo traces and logs over OTLP/protobuf, `--db` per org).
+
+### v0.2.0: Logs and playground (ready)
+
+Added: Logs page: filter bar, histogram, fields sidebar with types and quick mode, top values, expandable rows, paging; Source details and Search Around; SQL mode (parser-validated, window macros, row cap), CSV/NDJSON export; Playground mode (`grepui playground --demo-data`, `make demo`) with deterministic demo data and a live traffic trickle; Security workflow (Semgrep, Trivy filesystem and image scans) and a base image without OpenSSL.
+
+Verified live on GreptimeDB v1.2.1 (found and fixed): `INTERVAL '10 minutes'` parses over HTTP but not in MySQL prepared statements (the histogram uses integer arithmetic); `SHOW CREATE TABLE` backticks identifiers over the MySQL protocol and double-quotes them over HTTP; dotted attribute keys need the JSON path form `["http.method"]`; `LIKE` supports only the backslash escape; `DESC TABLE x` needs normalising for the SQL parser. Export is fetched then written (capped at 10 000 rows), not streamed from the database. SQL mode is confined to the org's database by parsing table references; `information_schema` is refused until access control (v0.11.0).
+
+### v0.1.0: Foundation (ready)
+
+Added: Crate `grepui` (axum 0.8, sqlx MySQL protocol, clap): `serve`, `healthcheck`; `query/`: `Q`, `Bind`, `Reader`, `SqlxReader`, pure builders; `api/` health, info, streams, connect; `ui/`: shell, router, time range, "Show SQL" drawer, Streams page, Connect page; Pipeline: Makefile, workflows, `deny.toml`, Dockerfile, compose, scripts.
+
+Verified so far: GreptimeDB OTLP is protobuf-only; table columns of the two OTLP tables (see RELEASE.md section 5).
+
+**Planned, not built yet (newest first):**
 
 ### v1.0.0: Launch hardening (planned)
 
@@ -127,18 +143,6 @@ Will add: `grepui migrate` and the `grepui_*` metadata tables (schema version ta
 
 The first release that writes (to `grepui_*` only). ARCH 06 D2 narrows to "data plane read-only".
 
-### v0.2.0: Logs (planned)
-
-Will add: Logs page: query bar, histogram, results table, expandable rows; Fields sidebar with types, quick mode, top values; Source details and Search Around; SQL mode (parser-validated), CSV/NDJSON export.
-
-To verify live: `matches_term` with bound parameters; `json_get_string` with dotted keys; parser crate choice (`sqlparser`) covers GreptimeDB dialect statements used in SQL mode.
-
-### v0.1.0: Foundation (ready)
-
-Added: Crate `grepui` (axum 0.8, sqlx MySQL protocol, clap): `serve`, `healthcheck`; `query/`: `Q`, `Bind`, `Reader`, `SqlxReader`, pure builders; `api/` health, info, streams, connect; `ui/`: shell, router, time range, "Show SQL" drawer, Streams page, Connect page; Pipeline: Makefile, workflows, `deny.toml`, Dockerfile, compose, scripts.
-
-Verified so far: GreptimeDB OTLP is protobuf-only; table columns of the two OTLP tables (see RELEASE.md section 5).
-
 ## 5. Verified and unverified
 
 Honest ledger of what has actually been run. Updated as releases land.
@@ -149,10 +153,14 @@ Honest ledger of what has actually been run. Updated as releases land.
 | GreptimeDB OTLP accepts only protobuf (`application/x-protobuf`) | verified live on v1.2.1 (JSON returns 400) |
 | `scripts/seed.py` writes traces and logs; `opentelemetry_traces`, `opentelemetry_logs` and the `_services` / `_operations` tables appear | verified live on v1.2.1 |
 | Column names, types and roles of the two OTLP tables (span attributes are flat `span_attributes.*` columns) | verified live on v1.2.1 |
-| Bound parameters over the MySQL protocol for `date_bin`, `approx_percentile_cont`, `matches_term`, `json_get_string`, `TQL EVAL`, process list, `ALTER TABLE ... SET ttl`, pipeline API, Flow DDL | **not yet run**: first exercised in the release that needs each |
-| v0.1.0 code | `make check` green (36 offline tests plus `ac-map`); `make test-db` green on GreptimeDB v1.2.1; `cargo deny` and `cargo audit` clean; UI checked in a real browser (screenshots in `images/`) |
-| Bound timestamp parameters, `TIMESTAMP(9)` and `JSON` decoding over the MySQL protocol, `information_schema.tables/columns` | verified live on v1.2.1 (found and fixed: sqlx needs `DateTime<Utc>` for `TIMESTAMP` and its `json` feature for `JSON`) |
-| CI workflows, Dockerfile, docker compose | written for cargo, **not yet run** (need a pushed tag / `make docker-build`) |
+| Bound parameters over the MySQL protocol for `approx_percentile_cont`, `TQL EVAL`, process list, `ALTER TABLE ... SET ttl`, pipeline API, Flow DDL | **not yet run**: first exercised in the release that needs each |
+| v0.1.0 and v0.2.0 code | `make check` green (offline tests + `ac-map`); `make test-db` green on GreptimeDB v1.2.1 (live tests for streams, search, histogram, search around, fulltext, playground); `cargo deny` and `cargo audit` clean; UI checked in a real browser (screenshots in `images/`) |
+| Bound timestamp parameters, `TIMESTAMP(9)` and `JSON` decoding, `information_schema` | verified live (v0.1.0): sqlx needs `DateTime<Utc>` for `TIMESTAMP` and its `json` feature for `JSON` |
+| `matches_term` with a bound term, `json_get_string` with dotted keys (path form `["k.x"]`), bound `LIKE` with backslash escapes, `CAST(CAST(ts AS BIGINT) AS VARCHAR)` nanosecond keys, `UNION ALL` of ordered limited selects, `SHOW CREATE TABLE`, `DESC TABLE`, SQL-mode window macros | verified live (v0.2.0); details in ARCH/03 |
+| `date_bin(INTERVAL '..')` in prepared statements | **fails** over the MySQL protocol (works over HTTP): the histogram uses integer arithmetic instead (found by the live test) |
+| Playground: seed through OTLP, exactly-once on restart, refusal outside `demo`/`demo_*` | verified live (`ac_0_2_9_playground_seeds_once_live`) and in a browser (live traffic trickle visible in counts) |
+| Security workflow tools | Semgrep (Rust, JS, Python, secrets, GitHub Actions, Dockerfile packs) clean on the tree; Trivy filesystem clean; Trivy image found a HIGH `libssl3` CVE in the `distroless/cc` base, **fixed** by switching to `base-nossl` + `libgcc_s` (rescanned clean, container runs); the workflow itself has not run on GitHub |
+| CI, release and docker workflows | written for cargo; **not yet run on GitHub** (needs a pushed tag); the Docker build and container health were run locally |
 | Quickwit UI details (React, TypeScript, Vite, MUI, Monaco) | from a documentation summary; UI source was not read ([ARCH 02](ARCH/02_reference_uis.md)) |
 
 ## 6. How a release is cut

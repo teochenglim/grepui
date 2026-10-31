@@ -4,17 +4,18 @@ A multi-tenant observability UI for [GreptimeDB](https://greptime.com), in one R
 
 grepui reads what your collectors already send to GreptimeDB. It does not ingest telemetry itself. Every panel can show the SQL it ran ("Show SQL"), and every route is scoped to an org (a tenant mapped to a GreptimeDB database).
 
-**Status: v0.1.0 (foundation).** Available now: Streams (every table, its schema, exact stats and newest rows), Connect (how to send OTLP and Prometheus data, with copy-ready snippets), org switcher, time range, Show SQL. Logs, traces, services, metrics, dashboards, alerts and the enterprise tier are planned: see [RELEASE.md](RELEASE.md) for the plan and [ARCH/07_parity_matrix.md](ARCH/07_parity_matrix.md) for the feature comparison and gaps.
+**Status: v0.2.0 (logs).** Available now: Logs (filter bar, histogram, fields with types and top values, expandable records with Search Around, SQL mode, CSV/NDJSON export), Streams, Connect (how to send OTLP and Prometheus data, with copy-ready snippets), org switcher, time range, Show SQL, and a playground mode with demo data. Traces, services, metrics, dashboards, alerts and the enterprise tier are planned: see [RELEASE.md](RELEASE.md) for the plan and [ARCH/07_parity_matrix.md](ARCH/07_parity_matrix.md) for the feature comparison and gaps.
 
 ## Try it
 
 ```sh
 make db-up                 # GreptimeDB v1.2.1 in docker (HTTP 4000, MySQL 4002)
-make seed                  # demo traces + logs over OTLP (ORG=tenant_a seeds another database)
-make run                   # http://127.0.0.1:8080
+make playground           # seeds a `demo` database with demo traces + logs, keeps live traffic going, serves http://127.0.0.1:8080
 ```
 
-Or everything in docker: `make demo`.
+Or everything in docker: `make demo` (one grepui container in playground mode, no seed step).
+
+Playground writes demo data **only** to a database named `demo` or `demo_*`, only when it is empty, and only from `grepui playground --demo-data`; `grepui serve` never writes telemetry ([ADR 0005](docs/adr/0005-playground-mode-demo-data.md)). To use your own data: `make run` against a GreptimeDB that your collectors write to (see the Connect page).
 
 ## Configuration
 
@@ -28,6 +29,8 @@ Flags, with environment variables for containers:
 | `--traces-table` / `--logs-table` | `GREPUI_TRACES_TABLE` / `GREPUI_LOGS_TABLE` | `opentelemetry_traces` / `opentelemetry_logs` |
 | `--query-timeout-secs` | `GREPUI_QUERY_TIMEOUT_SECS` | `30` |
 
+`grepui playground --demo-data [--wait 90] [--traces 300] [--minutes 120] [--seed 7] [--no-live] [--greptime-http http://host:4000]` seeds and serves; `GREPTIME_HTTP` is where it writes (defaults to `--greptime-http-public`).
+
 `grepui healthcheck` exits 0 when a running instance answers `/healthz` (used by the container health check).
 
 ## API
@@ -40,6 +43,11 @@ All data routes are `GET /api/v1/orgs/{org}/...` and return `{ "data": ..., "met
 | `/streams` | tables with kind and row estimate |
 | `/streams/{name}`, `/stats`, `/sample?from&to&limit` | schema with roles, exact count and time range, newest rows |
 | `/connect` | endpoints, headers and snippets for sending telemetry |
+| `/logs?from&to&q&level&limit&offset` | search; `q` is the filter bar (`key=value`, `key!=value`, `key~substring`, `"quoted text"`) |
+| `/logs/histogram`, `/logs/fields`, `/logs/fields/{field}/values` | hits over time, columns with types, top values |
+| `/logs/record?ts_ns`, `/logs/around?ts_ns&n` | one record by nanosecond key; neighbours in storage order |
+| `/logs/export?...&format=csv\|ndjson` | download (capped at 10 000 rows) |
+| `/sql?sql&from&to&limit` | SQL mode: one read-only statement, `$__from`/`$__to` macros |
 
 ## Safety
 

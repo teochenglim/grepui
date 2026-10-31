@@ -1,6 +1,10 @@
 //! Pure SQL builders. Identifiers are validated, values are binds, every statement is tagged.
 
-use super::{Bind, Q, Window, qualified, quote, ts_string};
+use super::{
+    Bind, Q, Window,
+    filter::{FtMode, LogFilter},
+    logs, qualified, quote, ts_string,
+};
 
 pub fn health() -> Q {
     Q::new("health", "SELECT 1 AS ok", vec![])
@@ -59,11 +63,24 @@ pub fn all_for_tests() -> Vec<Q> {
         to_ms: 2_000,
         limit: 10,
     };
+    let f = LogFilter::new(
+        Some("level=error http.method~GET timeout"),
+        None,
+        FtMode::Term,
+    )
+    .expect("valid filter");
     vec![
         health(),
         streams_list("public"),
         stream_schema("public", "t"),
         stream_stats("public", "t", "ts").expect("valid idents"),
         stream_sample("public", "t", "ts", w).expect("valid idents"),
+        logs::search("public", "l", &f, w, 0).expect("valid idents"),
+        logs::histogram("public", "l", &f, w).expect("valid idents"),
+        logs::top_values("public", "l", &logs::Col::Plain("severity_text"), &f, w, 10)
+            .expect("valid idents"),
+        logs::record("public", "l", 1_760_000_000_000_000_000).expect("valid idents"),
+        logs::around("public", "l", 1_760_000_000_000_000_000, 5, 5).expect("valid idents"),
+        logs::ddl("public", "l").expect("valid idents"),
     ]
 }

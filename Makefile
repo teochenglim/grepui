@@ -26,6 +26,10 @@ build: ## Build the release binary into ./bin (the UI in web/static/ is embedded
 run: ## Run against a local GreptimeDB (make db-up && make seed first); UI on http://127.0.0.1:8080
 	cargo run -- serve
 
+.PHONY: playground
+playground: ## Playground against a local GreptimeDB: seeds the `demo` database, trickles live demo traffic, serves :8080
+	cargo run -- playground --demo-data --wait 30 --greptime-mysql mysql://root@127.0.0.1:4002/demo
+
 .PHONY: test
 test: ## Run the Rust test suite (unit + AC tests, no DB needed)
 	cargo test --locked
@@ -73,11 +77,9 @@ docker-build: ## Build the container image (tag :$(VERSION_CURRENT))
 	docker build --build-arg VERSION=v$(VERSION_CURRENT) -t $(IMAGE):$(VERSION_CURRENT) -t $(IMAGE):latest .
 
 .PHONY: demo
-demo: ## GreptimeDB + grepui from docker compose, then seed demo data (UI http://127.0.0.1:8080)
+demo: ## GreptimeDB + grepui (playground mode: seeds demo data itself) from docker compose (UI http://127.0.0.1:8080)
 	docker compose up -d --build
-	@for i in $$(seq 1 30); do curl -sf http://127.0.0.1:4000/health >/dev/null && break; sleep 1; done
-	python3 scripts/seed.py
-	@echo "grepui: http://127.0.0.1:8080"
+	@echo "grepui: http://127.0.0.1:8080  (the first start seeds demo data before it listens)"
 
 .PHONY: docker-push
 docker-push: ## Manual push to GHCR (CI does this on tags). Needs `docker login ghcr.io` first.

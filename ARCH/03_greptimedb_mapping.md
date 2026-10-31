@@ -36,3 +36,19 @@ Written from docs, not yet executed (see AGENTS.md rule on testing against the p
 - Not supported yet: the `greptime_trace_v2` schema (JSON2 attribute columns).
 
 Each is one function in the query builders, so a dialect fix is a small edit. `_live` tests (`make test-db`) cover each in the release that needs it.
+
+## Verified live (GreptimeDB v1.2.1, MySQL protocol)
+
+| Item | Result |
+|---|---|
+| Bound `TIMESTAMP` comparison (`timestamp >= ?` with `'YYYY-MM-DD HH:MM:SS.mmm'`) | works |
+| `matches_term(body, ?)` with a bound term | works (fulltext index present on the OTLP logs table) |
+| `json_get_string(col, ?)` with a flat key containing dots | works only in path form `["http.method"]`; the plain dotted key returns NULL |
+| `LIKE ?` with escapes | only the backslash escape is supported (`ESCAPE '!'` is rejected) |
+| `CAST(CAST(timestamp AS BIGINT) AS VARCHAR)` | exact nanosecond key as a string (a number would lose precision in JS) |
+| `date_bin(INTERVAL '10 minutes', ts)` | works over HTTP, **fails in prepared statements** (the histogram uses `(CAST(ts AS BIGINT) / bucket_ns) * bucket_ms`) |
+| `SHOW CREATE TABLE` | identifiers are backticked over the MySQL protocol (double-quoted over HTTP); the `body` line carries `FULLTEXT INDEX` |
+| `UNION ALL` of two parenthesised `ORDER BY ... LIMIT` selects | works (Search Around) |
+| `TIMESTAMP(9)` / `JSON` result columns | sqlx needs `DateTime<Utc>` and its `json` feature |
+| `DESC TABLE t`, `SHOW TABLES`, `SHOW CREATE TABLE` through SQL mode | work |
+| OTLP ingest | protobuf only; `x-greptime-db-name` selects the database |

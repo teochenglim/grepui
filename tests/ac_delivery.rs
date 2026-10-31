@@ -104,3 +104,43 @@ fn ac_0_1_13_release_checks_tag() {
         "native builds only, no emulation"
     );
 }
+
+#[test]
+fn ac_0_1_13_security_workflow_scans_on_schedule() {
+    let sec = workflows()
+        .into_iter()
+        .find(|(f, _)| f == "security.yml")
+        .expect("security.yml")
+        .1;
+    for needle in [
+        "semgrep",
+        "p/rust",
+        "p/secrets",
+        "p/github-actions",
+        "trivy-action",
+        "scan-type: fs",
+        "image-ref:",
+        "cron:",
+        "upload-sarif",
+        "severity: CRITICAL,HIGH",
+    ] {
+        assert!(sec.contains(needle), "security.yml should contain {needle}");
+    }
+    // Least privilege: read-only by default; only SARIF-uploading jobs get security-events: write.
+    let top = sec.split("\njobs:").next().unwrap();
+    assert!(
+        top.contains("contents: read") && !top.contains("security-events"),
+        "write permissions belong on jobs, not the workflow"
+    );
+    assert_eq!(
+        sec.matches("security-events: write").count(),
+        3,
+        "one per scanning job"
+    );
+    // The runtime image must stay free of OpenSSL (grepui does no TLS).
+    let docker = fs::read_to_string("Dockerfile").unwrap();
+    assert!(
+        docker.contains("base-nossl"),
+        "runtime image without libssl"
+    );
+}

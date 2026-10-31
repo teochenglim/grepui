@@ -34,6 +34,16 @@ pub enum ReadError {
     Db(String),
 }
 
+impl ReadError {
+    /// The underlying reason, for operator-facing messages (startup, logs). Never sent to HTTP clients.
+    pub fn detail(&self) -> String {
+        match self {
+            ReadError::Timeout => "the query timed out".into(),
+            ReadError::Db(d) => d.clone(),
+        }
+    }
+}
+
 impl From<ReadError> for ApiError {
     fn from(e: ReadError) -> Self {
         match e {

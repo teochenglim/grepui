@@ -68,6 +68,7 @@ pub async fn get(State(s): State<Shared>, Path(org): Path<String>) -> Result<Res
         ms: 0,
         rows: 0,
         source: "config",
+        note: None,
     };
     Ok(ok(data, meta))
 }

@@ -2,6 +2,8 @@
 
 pub mod connect;
 pub mod health;
+pub mod logs;
+pub mod sql;
 pub mod streams;
 
 use crate::{
@@ -26,6 +28,8 @@ pub struct AppState {
     pub cfg: Arc<Config>,
     pub orgs: Orgs,
     pub reader: Arc<dyn Reader>,
+    /// Whether each org's logs table has a fulltext index on `body` (R-L6), cached briefly.
+    pub ft_cache: std::sync::Mutex<std::collections::HashMap<String, (std::time::Instant, bool)>>,
 }
 
 pub type Shared = Arc<AppState>;
@@ -38,6 +42,7 @@ impl AppState {
             cfg: Arc::new(cfg),
             orgs,
             reader,
+            ft_cache: Default::default(),
         }))
     }
 
@@ -74,6 +79,14 @@ pub const ROUTES: &[&str] = &[
     "/api/v1/orgs/{org}/streams/{name}/stats",
     "/api/v1/orgs/{org}/streams/{name}/sample",
     "/api/v1/orgs/{org}/connect",
+    "/api/v1/orgs/{org}/logs",
+    "/api/v1/orgs/{org}/logs/histogram",
+    "/api/v1/orgs/{org}/logs/fields",
+    "/api/v1/orgs/{org}/logs/fields/{field}/values",
+    "/api/v1/orgs/{org}/logs/record",
+    "/api/v1/orgs/{org}/logs/around",
+    "/api/v1/orgs/{org}/logs/export",
+    "/api/v1/orgs/{org}/sql",
 ];
 
 pub fn router(state: Shared) -> Router {
@@ -93,6 +106,17 @@ pub fn router(state: Shared) -> Router {
             get(streams::sample),
         )
         .route("/api/v1/orgs/{org}/connect", get(connect::get))
+        .route("/api/v1/orgs/{org}/logs", get(logs::search))
+        .route("/api/v1/orgs/{org}/logs/histogram", get(logs::histogram))
+        .route("/api/v1/orgs/{org}/logs/fields", get(logs::fields))
+        .route(
+            "/api/v1/orgs/{org}/logs/fields/{field}/values",
+            get(logs::top_values),
+        )
+        .route("/api/v1/orgs/{org}/logs/record", get(logs::record))
+        .route("/api/v1/orgs/{org}/logs/around", get(logs::around))
+        .route("/api/v1/orgs/{org}/logs/export", get(logs::export))
+        .route("/api/v1/orgs/{org}/sql", get(sql::run))
         .fallback(fallback)
         .with_state(state)
 }
