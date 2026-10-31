@@ -32,7 +32,7 @@ migrate: ## Create or upgrade grepui's own tables (saved views, history) in the 
 
 .PHONY: playground
 playground: ## Playground against a local GreptimeDB: seeds the `demo` database, trickles live demo traffic, serves :8080
-	cargo run -- playground --demo-data --wait 30 --greptime-mysql mysql://root@127.0.0.1:4002/demo
+	cargo run -- playground --demo-data --admin-writes --wait 30 --greptime-mysql mysql://root@127.0.0.1:4002/demo
 
 .PHONY: test
 test: ## Run the Rust test suite (unit + AC tests, no DB needed)

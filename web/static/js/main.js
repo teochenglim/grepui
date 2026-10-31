@@ -13,6 +13,8 @@ import { tracesPage } from './pages/traces.js';
 import { serviceDetailPage } from './pages/service-detail.js';
 import { serviceMapPage } from './pages/service-map.js';
 import { servicesPage } from './pages/services.js';
+import { retentionPage } from './pages/retention.js';
+import { rollupsPage } from './pages/rollups.js';
 import { streamDetailPage } from './pages/stream-detail.js';
 import { streamsPage } from './pages/streams.js';
 import { route, start } from './router.js';
@@ -30,6 +32,8 @@ route('catalog', catalogPage);
 route('streams', streamsPage);
 route('streams/:name', streamDetailPage);
 route('connect', connectPage);
+route('rollups', rollupsPage);
+route('retention', retentionPage);
 route('health', healthPage);
 route('*', notFound);
 

@@ -9,7 +9,7 @@ import { fmtNum, fmtUs, serviceColor } from '../util/format.js';
 
 export const serviceHref = (name) => href('services', name);
 
-export const fmtRate = (r) => (Number(r) >= 10 ? Number(r).toFixed(0) : Number(r).toFixed(2));
+export const fmtRate = (r) => (Number(r) >= 10 ? Number(r).toFixed(0) : Number(r) >= 0.1 || Number(r) === 0 ? Number(r).toFixed(2) : Number(r).toPrecision(2));
 export const errBadge = (pct) => (Number(pct) > 0 ? h('span', { class: `badge ${Number(pct) >= 5 ? 'bad' : 'warn'}` }, `${Number(pct).toFixed(1)}%`) : h('span', { class: 'muted' }, '0%'));
 
 export async function servicesPage(view) {
@@ -17,8 +17,8 @@ export async function servicesPage(view) {
   mount(view, h('div', { class: 'page-head' }, h('h2', null, 'Services'), h('span', { class: 'sub' }, 'rate, errors and duration of server and consumer spans')), out);
   const w = timeWindow();
   try {
-    const { data } = await api.get('services', { from: w.from, to: w.to });
-    mount(out, dataTable({
+    const { data, meta } = await api.get('services', { from: w.from, to: w.to });
+    mount(out, meta.note ? h('div', { class: 'callout' }, meta.note) : null, dataTable({
       rows: data, empty: 'No spans in this range. Widen the time range or see Connect.',
       onRow: (r) => (location.hash = serviceHref(r.service_name)),
       columns: [

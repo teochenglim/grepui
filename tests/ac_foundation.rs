@@ -255,6 +255,8 @@ fn fill(route: &str) -> String {
         .replace("{name}", "t")
         .replace("{field}", "severity_text")
         .replace("{service}", "cart")
+        .replace("{template}", "traces_red")
+        .replace("{stream}", "traces")
         .replace("{id}", "0123456789abcdef")
         .replace("{trace_id}", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 }
@@ -288,7 +290,11 @@ async fn ac_0_1_4_every_listed_route_exists() {
             "{route} is listed but not routed"
         );
         // Write-only routes (PUT/DELETE) answer GET with 405 by design.
-        if !route.ends_with("/annotation") {
+        let write_only = route.ends_with("/annotation")
+            || route.ends_with("/rollups/{template}")
+            || route.ends_with("/backfill")
+            || route.ends_with("/retention/{stream}");
+        if !write_only {
             assert_ne!(r.status, StatusCode::METHOD_NOT_ALLOWED, "{route}");
         }
     }

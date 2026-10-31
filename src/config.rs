@@ -35,6 +35,10 @@ pub struct Config {
     /// Database holding grepui's own state (saved views, history); created by `grepui migrate`.
     #[arg(long, env = "GREPUI_META_DATABASE", default_value = "grepui")]
     pub meta_database: String,
+    /// Allow admin writes: rollup create/backfill/drop and retention (TTL) changes. Off by default;
+    /// the stand-in for an admin role until access control (v0.11.0).
+    #[arg(long, env = "GREPUI_ADMIN_WRITES")]
+    pub admin_writes: bool,
     /// Per-query timeout in seconds.
     #[arg(long, env = "GREPUI_QUERY_TIMEOUT_SECS", default_value_t = 30)]
     pub query_timeout_secs: u64,
@@ -49,6 +53,7 @@ impl Default for Config {
             traces_table: "opentelemetry_traces".into(),
             logs_table: "opentelemetry_logs".into(),
             meta_database: "grepui".into(),
+            admin_writes: false,
             query_timeout_secs: 30,
         }
     }

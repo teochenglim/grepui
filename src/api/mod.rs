@@ -7,6 +7,7 @@ pub mod logs;
 pub mod metrics;
 pub mod services;
 pub mod sql;
+pub mod storage;
 pub mod streams;
 pub mod traces;
 pub mod views;
@@ -135,6 +136,63 @@ impl AppState {
             .map_err(store_error)
     }
 
+    fn admin_enabled(&self) -> Result<(), ApiError> {
+        if self.cfg.admin_writes {
+            Ok(())
+        } else {
+            Err(ApiError(
+                StatusCode::FORBIDDEN,
+                "admin writes are disabled; start grepui with --admin-writes (or GREPUI_ADMIN_WRITES=1)"
+                    .into(),
+            ))
+        }
+    }
+
+    /// Admin DDL (rollup create/drop, TTL): needs `--admin-writes`, passes `admin::check`, is logged.
+    pub async fn admin_ddl(
+        &self,
+        org: &Org,
+        name: &'static str,
+        sql: &str,
+    ) -> Result<Meta, ApiError> {
+        self.admin_enabled()?;
+        crate::admin::check(sql, 0, org)?;
+        tracing::info!(target: "audit", org = %org.name, actor = crate::store::LOCAL_USER, action = name, %sql, "admin write");
+        let t = Instant::now();
+        self.writer.ddl(sql).await.map_err(store_error)?;
+        Ok(Meta {
+            query: name.to_string(),
+            sql: sql.to_string(),
+            binds: vec![],
+            ms: t.elapsed().as_millis() as u64,
+            rows: 0,
+            source: "raw",
+            note: None,
+        })
+    }
+
+    /// Admin bulk insert (rollup backfill chunk); same gate and audit line as [`Self::admin_ddl`].
+    pub async fn admin_exec(&self, org: &Org, q: Q) -> Result<Meta, ApiError> {
+        self.admin_enabled()?;
+        let body = q
+            .sql
+            .strip_prefix(&format!("/* q:{} */ ", q.name))
+            .unwrap_or_default();
+        crate::admin::check(body, q.binds.len(), org)?;
+        tracing::info!(target: "audit", org = %org.name, actor = crate::store::LOCAL_USER, action = q.name, binds = ?q.binds, "admin write");
+        let t = Instant::now();
+        let n = self.writer.exec(&q).await.map_err(store_error)?;
+        Ok(Meta {
+            query: q.name.to_string(),
+            sql: q.sql.clone(),
+            binds: q.binds.iter().map(query::Bind::show).collect(),
+            ms: t.elapsed().as_millis() as u64,
+            rows: n as usize,
+            source: "raw",
+            note: None,
+        })
+    }
+
     pub fn org(&self, name: &str) -> Result<&Org, ApiError> {
         self.orgs.resolve(name)
     }
@@ -188,6 +246,12 @@ pub const ROUTES: &[&str] = &[
     "/api/v1/orgs/{org}/services/{service}/annotation",
     "/api/v1/orgs/{org}/dependencies",
     "/api/v1/orgs/{org}/catalog",
+    "/api/v1/orgs/{org}/rollups",
+    "/api/v1/orgs/{org}/rollups/{template}",
+    "/api/v1/orgs/{org}/rollups/{template}/backfill",
+    "/api/v1/orgs/{org}/retention",
+    "/api/v1/orgs/{org}/retention/{stream}",
+    "/api/v1/orgs/{org}/retention/{stream}/preview",
     "/api/v1/orgs/{org}/metrics",
     "/api/v1/orgs/{org}/metrics/query",
     "/api/v1/orgs/{org}/metrics/{name}/labels",
@@ -208,6 +272,10 @@ pub const WRITE_ROUTES: &[(&str, &str)] = &[
     ("PUT", "/api/v1/orgs/{org}/views/{id}"),
     ("DELETE", "/api/v1/orgs/{org}/views/{id}"),
     ("POST", "/api/v1/orgs/{org}/history"),
+    ("POST", "/api/v1/orgs/{org}/rollups/{template}"),
+    ("POST", "/api/v1/orgs/{org}/rollups/{template}/backfill"),
+    ("DELETE", "/api/v1/orgs/{org}/rollups/{template}"),
+    ("PUT", "/api/v1/orgs/{org}/retention/{stream}"),
     ("PUT", "/api/v1/orgs/{org}/services/{service}/annotation"),
     ("DELETE", "/api/v1/orgs/{org}/services/{service}/annotation"),
 ];
@@ -266,6 +334,24 @@ pub fn router(state: Shared) -> Router {
             get(services::dependencies),
         )
         .route("/api/v1/orgs/{org}/catalog", get(services::catalog))
+        .route("/api/v1/orgs/{org}/rollups", get(storage::rollups))
+        .route(
+            "/api/v1/orgs/{org}/rollups/{template}",
+            axum::routing::post(storage::rollup_create).delete(storage::rollup_drop),
+        )
+        .route(
+            "/api/v1/orgs/{org}/rollups/{template}/backfill",
+            axum::routing::post(storage::rollup_backfill),
+        )
+        .route("/api/v1/orgs/{org}/retention", get(storage::retention))
+        .route(
+            "/api/v1/orgs/{org}/retention/{stream}",
+            axum::routing::put(storage::retention_set),
+        )
+        .route(
+            "/api/v1/orgs/{org}/retention/{stream}/preview",
+            get(storage::retention_preview),
+        )
         .route("/api/v1/orgs/{org}/metrics", get(metrics::names))
         .route("/api/v1/orgs/{org}/metrics/query", get(metrics::query))
         .route(

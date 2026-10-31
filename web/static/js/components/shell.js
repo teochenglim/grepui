@@ -17,6 +17,8 @@ const LIVE = [
   ['catalog', 'Catalog'],
   ['streams', 'Streams'],
   ['health', 'Data health'],
+  ['rollups', 'Rollups'],
+  ['retention', 'Retention'],
   ['connect', 'Connect'],
 ];
 const SOON = [

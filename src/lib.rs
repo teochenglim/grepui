@@ -1,6 +1,7 @@
 //! grepui: a multi-tenant observability UI for GreptimeDB, in one Rust binary.
 #![forbid(unsafe_code)]
 
+pub mod admin;
 pub mod api;
 pub mod config;
 pub mod error;

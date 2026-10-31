@@ -27,6 +27,70 @@ pub struct Params {
     self_loops: Option<bool>,
 }
 
+const SINK_TTL: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// Does the org's rollup sink table exist? Cached briefly (the planner asks on every call).
+async fn has_rollup(s: &Shared, org: &crate::org::Org) -> bool {
+    let Ok(plan) = crate::admin::Plan::for_org(org, "traces_red") else {
+        return false;
+    };
+    let key = format!("{}/{}", org.name, plan.sink);
+    if let Some((at, c)) = s.cols_cache.lock().ok().and_then(|m| m.get(&key).cloned())
+        && at.elapsed() < SINK_TTL
+    {
+        return !c.is_empty();
+    }
+    let Ok((rows, _)) = s
+        .run(crate::query::build::stream_schema(
+            &org.database,
+            &plan.sink,
+        ))
+        .await
+    else {
+        return false;
+    };
+    let cols: std::sync::Arc<Vec<String>> = std::sync::Arc::new(
+        rows.iter()
+            .filter_map(|r| r["column_name"].as_str().map(str::to_string))
+            .collect(),
+    );
+    let exists = !cols.is_empty();
+    if let Ok(mut m) = s.cols_cache.lock() {
+        m.insert(key, (std::time::Instant::now(), cols));
+    }
+    exists
+}
+
+/// RED rows from raw spans or the rollup, by the planner (R-P1); `meta.source` says which (R-P2).
+async fn red_rows(
+    s: &Shared,
+    org: &crate::org::Org,
+    only: Option<&str>,
+    w: Window,
+) -> Result<(Vec<Value>, crate::query::Meta, services::Source), ApiError> {
+    let source = services::plan(w.to_ms - w.from_ms, has_rollup(s, org).await);
+    let q = if source == services::Source::Rollup {
+        let sink = crate::admin::Plan::for_org(org, "traces_red")?.sink;
+        services::services_rollup(&org.database, &sink, only, w)
+    } else {
+        services::services(&org.database, &org.traces_table, only, w)
+    };
+    let (rows, mut meta) = s.run(bad_table(q)?).await?;
+    annotate_source(&mut meta, source);
+    Ok((rows, meta, source))
+}
+
+fn annotate_source(meta: &mut crate::query::Meta, source: services::Source) {
+    match source {
+        services::Source::Raw => {}
+        services::Source::Rollup => {
+            meta.source = services::SOURCE_ROLLUP;
+            meta.note = Some(services::ROLLUP_NOTE.into());
+        }
+        services::Source::RawWithWarning => meta.note = Some(services::RAW_WARNING.into()),
+    }
+}
+
 fn bad_table<T>(r: anyhow::Result<T>) -> Result<T, ApiError> {
     r.map_err(|_| ApiError::bad("unsupported traces table name"))
 }
@@ -56,14 +120,7 @@ pub async fn list(
 ) -> Result<Response, ApiError> {
     let w = Window::parse(p.from, p.to, None)?;
     let org = s.org(&org)?;
-    let (rows, meta) = s
-        .run(bad_table(services::services(
-            &org.database,
-            &org.traces_table,
-            None,
-            w,
-        ))?)
-        .await?;
+    let (rows, meta, _) = red_rows(&s, org, None, w).await?;
     let data: Vec<Value> = rows
         .iter()
         .map(|r| with_rates(r, w.to_ms - w.from_ms))
@@ -80,25 +137,17 @@ pub async fn detail(
     let service = services::service_name(&service)?;
     let w = Window::parse(p.from, p.to, None)?;
     let org = s.org(&org)?;
-    let (summary, meta) = s
-        .run(bad_table(services::services(
-            &org.database,
-            &org.traces_table,
-            Some(&service),
-            w,
-        ))?)
-        .await?;
+    let (summary, meta, source) = red_rows(&s, org, Some(&service), w).await?;
     let row = summary.first().ok_or_else(|| {
         ApiError::not_found("no spans for that service in this time range; widen the range")
     })?;
-    let (series, _) = s
-        .run(bad_table(services::series(
-            &org.database,
-            &org.traces_table,
-            &service,
-            w,
-        ))?)
-        .await?;
+    let series_q = if source == services::Source::Rollup {
+        let sink = crate::admin::Plan::for_org(org, "traces_red")?.sink;
+        services::series_rollup(&org.database, &sink, &service, w)
+    } else {
+        services::series(&org.database, &org.traces_table, &service, w)
+    };
+    let (series, _) = s.run(bad_table(series_q)?).await?;
     let (ops, _) = s
         .run(bad_table(services::operations(
             &org.database,
@@ -176,14 +225,7 @@ pub async fn catalog(
 ) -> Result<Response, ApiError> {
     let w = Window::parse(p.from, p.to, None)?;
     let org = s.org(&org)?;
-    let (rows, meta) = s
-        .run(bad_table(services::services(
-            &org.database,
-            &org.traces_table,
-            None,
-            w,
-        ))?)
-        .await?;
+    let (rows, meta, _) = red_rows(&s, org, None, w).await?;
     let notes = s
         .read_store(
             build::service_notes(s.meta_db(), &org.name)

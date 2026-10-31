@@ -39,7 +39,7 @@ Status: `planned` (requirement ID and release; a row whose release is `ready` or
 | PromQL and SQL queries | read | | built R-M1, R-M2, 0.6 | `TQL EVAL` |
 | Share URL encoding chart type, query, stream, range, refresh | read | | built R-M2, 0.6 | |
 | Downsampling | nav | | planned R-P3, 0.7 | Flow templates |
-| Retention settings | read | | planned R-X1, 0.7 | |
+| Retention settings | read | | built R-X1, 0.7 | |
 | Alerting on metrics | read | | planned R-A1, 0.9 | PromQL query mode |
 
 ## Traces
@@ -109,8 +109,8 @@ Status: `planned` (requirement ID and release; a row whose release is `ready` or
 | Stream list with type, document count, size | read | | planned R-T1, R-S4, 0.1 and 0.3 | |
 | Time range, inferred field types | read | | planned R-S4, 0.3 | |
 | Full-text and partition key settings | read | | planned (view) R-S4; editing is a gap | Indexes are DDL in GreptimeDB |
-| Retention | read | | planned R-X1, 0.7 | TTL per table |
-| Extended retention | read | ent | differs R-X1, 0.7 | TTL policy and rollup tiering, not object-store tiering |
+| Retention | read | | built R-X1, 0.7 | TTL per table |
+| Extended retention | read | ent | differs (built) R-X1, 0.7 | TTL policy and rollup tiering, not object-store tiering |
 | Bring your own bucket | read | ent | n/a | GreptimeDB owns object storage |
 
 ## RUM

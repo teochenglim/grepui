@@ -2,7 +2,7 @@
 
 The single place to see where grepui stands: what is shipped, what is planned, what each release proves, and how a release is cut. Per-release detail (scope, acceptance criteria, named tests, checklist) lives in [`RELEASE/vX.Y.Z.md`](RELEASE/README.md); this file is the readable roll-up and the changelog.
 
-> **Current state:** v0.1.0 to v0.6.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.7.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
+> **Current state:** v0.1.0 to v0.7.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.8.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
 
 ## 1. Summary
 
@@ -21,7 +21,7 @@ grepui is a multi-tenant observability UI for GreptimeDB: one Rust binary (axum)
 
 ## 2. Release status
 
-Latest built: **v0.6.0: Metrics** (ready). Newest first.
+Latest built: **v0.7.0: Rollups and extended retention** (ready). Newest first.
 
 | Release | Theme | Status | ACs | Requirements covered |
 |---|---|---|---|---|
@@ -32,7 +32,7 @@ Latest built: **v0.6.0: Metrics** (ready). Newest first.
 | [v0.10.0](RELEASE/v0.10.0.md) | Pipelines, functions, enrichment, redaction | planned | 4 | R-F4 R-N1 R-N2 R-N3 R-N4 |
 | [v0.9.0](RELEASE/v0.9.0.md) | Alerts and incidents | planned | 8 | R-A1 R-A2 R-A3 R-A4 R-A5 R-A6 R-A7 R-A8 |
 | [v0.8.0](RELEASE/v0.8.0.md) | Dashboards | planned | 6 | R-B1 R-B2 R-B3 R-B4 R-B5 R-B6 |
-| [v0.7.0](RELEASE/v0.7.0.md) | Rollups and extended retention | planned | 4 | R-F4 R-P1 R-P2 R-P3 R-X1 |
+| [v0.7.0](RELEASE/v0.7.0.md) | Rollups and extended retention | ready | 4 | R-F4 R-P1 R-P2 R-P3 R-X1 |
 | [v0.6.0](RELEASE/v0.6.0.md) | Metrics | ready | 2 | R-M1 R-M2 |
 | [v0.5.0](RELEASE/v0.5.0.md) | Services and service map | ready | 4 | R-V1 R-V2 R-V3 R-V4 |
 | [v0.4.0](RELEASE/v0.4.0.md) | Traces and the v0.3.0 CI fix | ready | 6 | R-R1 R-R2 R-R3 R-R4 R-R5 R-R6 |
@@ -60,6 +60,12 @@ Newest first. An entry is written when a release becomes `ready`; the same text 
 ### Unreleased
 
 - Requirements, architecture, positioning and parity matrix (ARCH 00–07), release plan with ACs for v0.1.0–v1.0.0, `scripts/seed.py` (demo traces and logs over OTLP/protobuf, `--db` per org).
+
+### v0.7.0: Rollups and extended retention (ready)
+
+Added: a rollup planner (windows over 24 hours are answered from a per-minute RED rollup when one exists, `meta.source = rollup_1m`, no p95; otherwise raw spans with a warning); a Rollups page (create the sink table and Flow from a vetted template, chunked backfill, drop); a Retention page (TTL per stream, exact preview of rows older than the cutoff, set TTL, tiering hint). First release with DDL writes: they need `--admin-writes` (stand-in for the admin role until v0.11.0), come only from templates and pass an exact-match gate (ADR 0008); each is logged as an `audit` line. Playground and compose runs enable the flag.
+
+Verified live on a fresh v1.3.0: the sink equals the generator's numbers exactly, the batching flow keeps it current, a backfill is idempotent, TTL preview is exact. Metrics downsampling is not built. Not exercised in a browser: Drop, Apply TTL.
 
 ### v0.6.0: Metrics (ready)
 
@@ -139,12 +145,6 @@ Will add: Folders, dashboards, tabs; All panel types except Custom Charts (arbit
 
 Custom Charts are excluded: they would execute arbitrary JavaScript. The HTML panel is the safe subset.
 
-### v0.7.0: Rollups and extended retention (planned)
-
-Will add: Planner choosing raw or rollup with `meta.source`; Rollup management from vetted templates (traces RED, metrics downsampling) with backfill; Retention view and edit per stream; tiering policy.
-
-`docs/rollup.sql` Flow DDL verified here. First release with GreptimeDB DDL writes.
-
 ## 5. Verified and unverified
 
 Honest ledger of what has actually been run. Updated as releases land.
@@ -163,6 +163,7 @@ Honest ledger of what has actually been run. Updated as releases land.
 | OpenInference spans on trace v2 (JSON2) | spike on v1.3.0: stored with 19 fixed columns (300 indexed messages and a 200 KB prompt in one span), queried with `json_get_*(col, '["key"]')`; grepui's trace list/waterfall/logs work on a v2 table, its span panel and attribute filters do not yet (roadmap LLM track L1) |
 | CI-parity run (fresh `make db-down db-up`, seed, `make test-db`) | green for every live test after the v0.4.0 fixes; it reproduced the v0.3.0 CI failure and found the join bug below |
 | **GreptimeDB v1.2.1: `IN (subquery)`, `EXISTS` and self-joins on a telemetry table return wrong, nondeterministic rows** | verified live (4 / 6 / 5 / 0 for a true 33); no such query is used (ADR 0007); the v0.5.0 dependency self-join is verified correct on v1.3.0 (`ac_0_5_3_dependencies_live`) |
+| Rollup planner, rollup create/backfill/drop, retention preview and TTL set (v0.7.0) | verified live (exact sink contents, flow keeps up, idempotent backfill, exact preview) and in a browser; flow type on v1.3.0 is batching |
 | PromQL through TQL EVAL, metric and label lists, SQL on metric tables (v0.6.0) | verified live against generated metrics (exact counter and gauge values, rate within 5%) and in a browser; `TQL EVAL` works over the MySQL prepared-statement protocol |
 | Services RED, series, operations, dependencies and catalog notes (v0.5.0) | verified live against generated traces (counts, errors, average, p95 within 10%, every dependency edge) and in a browser |
 | Trace list, histogram, scatter, waterfall, flame graph, span panel, logs pivot (v0.4.0) | verified live against generated traces with exact numbers (`ac_0_4_*_live`) and in a browser (list, trace page, flame graph, logs tab, span panel) |

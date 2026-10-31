@@ -26,7 +26,7 @@ An org resolves (config, later the metadata store) to `{source, database, table 
 
 1. **Authentication and RBAC** (v0.11): deny by default; an exhaustive route table test proves every route checks permission.
 2. **Typed API:** clients cannot send SQL, except in SQL mode, where a parser accepts one read-only statement confined to the org's database (`query/sqlmode.rs`).
-3. **Write allowlist:** the only writes are `grepui_*` tables and admin-gated TTL, pipeline and flow operations (ARCH 06 D2), plus the playground's demo ingest (ADR 0005).
+3. **Write allowlist:** the only writes are `grepui_*` tables and admin-gated TTL, pipeline and flow operations (ARCH 06 D2), plus the playground's demo ingest (ADR 0005). Since v0.7.0 the admin writes are rollup sink and flow create/drop, a chunked backfill `INSERT ... SELECT` into the sink, and `ALTER TABLE ... SET 'ttl'` on the traces, logs and sink tables; they need `--admin-writes`, are generated from templates and pass `admin::check` (ADR 0008).
 4. **Database account:** run grepui with a GreptimeDB account that can read telemetry tables and write only `grepui_*`; startup warns if the account can do more (R-O3).
 
 ## Request flow

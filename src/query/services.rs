@@ -133,3 +133,75 @@ GROUP BY 1, 2 ORDER BY `calls` DESC, `caller` ASC, `callee` ASC LIMIT {EDGES_MAX
         binds,
     ))
 }
+
+// ---- rollup (R-P1, R-P2) ---------------------------------------------------------------
+
+/// Windows longer than this are answered from the rollup when one exists.
+pub const RAW_MAX_WINDOW_MS: i64 = 24 * 3_600_000;
+pub const SOURCE_ROLLUP: &str = "rollup_1m";
+pub const ROLLUP_NOTE: &str = "answered from the 1-minute rollup: p95 is not available because percentiles cannot be combined across minutes";
+pub const RAW_WARNING: &str = "this window is longer than 24 hours and there is no rollup, so raw spans were scanned (slow); create the traces RED rollup on the Rollups page";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Source {
+    Raw,
+    Rollup,
+    /// Raw spans because no rollup exists, although the window is long.
+    RawWithWarning,
+}
+
+/// Which table answers a window (R-P1).
+pub fn plan(window_ms: i64, has_rollup: bool) -> Source {
+    if window_ms <= RAW_MAX_WINDOW_MS {
+        Source::Raw
+    } else if has_rollup {
+        Source::Rollup
+    } else {
+        Source::RawWithWarning
+    }
+}
+
+/// The rollup's RED columns, each aggregate once. `p95_us` is NULL: it cannot be rebuilt.
+fn rollup_columns() -> &'static str {
+    "sum(`requests`) AS `requests`, sum(`errors`) AS `errors`, \
+CAST(sum(`sum_ns`) AS DOUBLE) / sum(`requests`) / 1000 AS `avg_us`, CAST(NULL AS DOUBLE) AS `p95_us`, \
+max(`max_ns`) / 1000 AS `max_us`"
+}
+
+/// Same row shape as [`services`], read from the sink table. `time_window` is TIMESTAMP(3), whose
+/// integer cast is already milliseconds.
+pub fn services_rollup(db: &str, sink: &str, only: Option<&str>, w: Window) -> anyhow::Result<Q> {
+    let t = qualified(db, sink)?;
+    let mut binds = window_binds(w);
+    let mut wh = "`time_window` >= ? AND `time_window` < ?".to_string();
+    if let Some(s) = only {
+        wh.push_str(" AND `service_name` = ?");
+        binds.push(Bind::Str(s.to_string()));
+    }
+    Ok(Q::new(
+        "services_red_rollup",
+        format!(
+            "SELECT `service_name`, min(CAST(`time_window` AS BIGINT)) AS `first_seen_ms`, \
+max(CAST(`time_window` AS BIGINT)) AS `last_seen_ms`, sum(`requests`) AS `spans`, {} \
+FROM {t} WHERE {wh} GROUP BY `service_name` ORDER BY `requests` DESC, `service_name` ASC LIMIT {SERVICES_MAX}",
+            rollup_columns()
+        ),
+        binds,
+    ))
+}
+
+pub fn series_rollup(db: &str, sink: &str, service: &str, w: Window) -> anyhow::Result<Q> {
+    let t = qualified(db, sink)?;
+    let (ms, _) = logs::bucket_for(w.to_ms - w.from_ms);
+    let mut binds = window_binds(w);
+    binds.push(Bind::Str(service.to_string()));
+    Ok(Q::new(
+        "service_series_rollup",
+        format!(
+            "SELECT (CAST(`time_window` AS BIGINT) / {ms}) * {ms} AS `bucket_ms`, {} \
+FROM {t} WHERE `time_window` >= ? AND `time_window` < ? AND `service_name` = ? GROUP BY 1 ORDER BY 1",
+            rollup_columns()
+        ),
+        binds,
+    ))
+}

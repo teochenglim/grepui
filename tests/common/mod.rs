@@ -446,6 +446,7 @@ impl Writer for MemStore {
                     .insert((s_of(&q.binds[0]), s_of(&q.binds[1])), q.binds.clone());
             }
             "history_add" => self.history.lock().unwrap().push(q.binds.clone()),
+            "rollup_backfill" => return Ok(5),
             "schema_put" => *self.version.lock().unwrap() = Some(i_of(&q.binds[1])),
             other => return Err(ReadError::Db(format!("unexpected write {other}"))),
         }
@@ -463,6 +464,23 @@ pub fn app_with_store(store: &Arc<MemStore>, clock: &Arc<AtomicI64>) -> Router {
     router(
         AppState::with_parts(
             Config::default(),
+            store.clone(),
+            store.clone(),
+            Arc::new(move || c.load(Ordering::SeqCst)),
+        )
+        .expect("state"),
+    )
+}
+
+/// Like [`app_with_store`] with admin writes switched on or off.
+pub fn app_admin(store: &Arc<MemStore>, clock: &Arc<AtomicI64>, admin: bool) -> Router {
+    let c = clock.clone();
+    router(
+        AppState::with_parts(
+            Config {
+                admin_writes: admin,
+                ..Config::default()
+            },
             store.clone(),
             store.clone(),
             Arc::new(move || c.load(Ordering::SeqCst)),

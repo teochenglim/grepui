@@ -16,13 +16,13 @@
 
 ## Long-range trace metrics
 
-RED from raw spans is fine for minutes and hours but slow over days. grepui uses GreptimeDB Flow:
+RED from raw spans is fine for minutes and hours but slow over days. grepui uses GreptimeDB Flow (verified on v1.3.0, ADR 0008):
 
-1. [`docs/rollup.sql`](../docs/rollup.sql) writes per-minute `requests, errors, sum_ns, max_ns` per service to a small sink table.
-2. In the rollup planner (R-P1) finds the sink. For ranges over the raw limit the Services page reads the rollup (the rollup builders).
-3. Raw spans can then use a short TTL while the rollup keeps months.
+1. The Rollups page (or `POST /rollups/traces_red`) creates the sink `<traces_table>_red_1m` (service_name tag, `time_window` TIMESTAMP(3), requests, errors, sum_ns, max_ns) and a flow `grepui_<db>_red_1m` that fills it per minute from server and consumer spans. `docs/rollup.sql` shows the same DDL for use outside grepui.
+2. The planner (R-P1) reads the sink for windows over 24 hours when it exists (Services list, catalog, per-service summary and series), reports `meta.source = rollup_1m`, and falls back to raw spans with a warning when it does not. Operations and dependencies always read raw spans.
+3. Raw spans can then use a short TTL while the rollup keeps months (Retention page).
 
-Limits: percentiles cannot be summed across buckets (rollup shows avg and max, not p95; a `uddsketch_state` column is the likely fix); a Flow only sees data written after creation (backfill with one `INSERT ... SELECT`); per-operation breakdown needs raw spans.
+Facts found live: v1.3.0 flows are the batching kind and recompute the windows that received writes from the source table, so a backfill (`INSERT INTO sink SELECT ... GROUP BY`, prepared with bound time limits) and the flow agree and a backfill is idempotent; the flow only reacts to writes after its creation, so history needs the backfill; `ADMIN FLUSH_FLOW('name')` forces a run; `ALTER TABLE t SET 'ttl' = '7d'` is echoed in `create_options` as `ttl=7days` and a 90 day TTL as `ttl=2months 29days 2h 52m 48s`; `'forever'` is accepted. Limits: percentiles cannot be summed across buckets (the rollup shows avg and max, not p95; a `uddsketch_state` column is the likely fix); per-operation breakdown needs raw spans.
 
 ## Unverified against a live GreptimeDB
 
