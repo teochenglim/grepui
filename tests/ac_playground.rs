@@ -399,6 +399,7 @@ async fn ac_0_2_9_playground_seeds_once_live() {
         seed: 11,
         live: false,
         force: false,
+        llm_data: false,
     };
 
     prepare(&cfg, &opts).await.expect("first run seeds");

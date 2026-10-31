@@ -101,6 +101,28 @@ fn bad_table<T>(r: anyhow::Result<T>) -> Result<T, ApiError> {
     r.map_err(|_| ApiError::bad("unsupported traces table name"))
 }
 
+/// Which attribute layout the org's traces table has (R-AI1): `flat` (trace v1) or `json`
+/// (trace v2). The UI shows it, and the filter bar adapts its hint.
+pub async fn layout_info(
+    State(s): State<Shared>,
+    Path(org): Path<String>,
+) -> Result<Response, ApiError> {
+    let org = s.org(&org)?;
+    let cols = columns(&s, org).await?;
+    Ok(ok(
+        json!({"layout": traces::Layout::detect(&cols), "table": org.traces_table, "columns": cols.len()}),
+        crate::query::Meta {
+            query: "traces_layout".into(),
+            sql: String::new(),
+            binds: vec![],
+            ms: 0,
+            rows: 0,
+            source: "raw",
+            note: None,
+        },
+    ))
+}
+
 pub async fn list(
     State(s): State<Shared>,
     axum::Extension(id): axum::Extension<crate::auth::Identity>,

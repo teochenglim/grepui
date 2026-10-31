@@ -89,6 +89,8 @@ Parity with the reference platform is tracked in [07_parity_matrix.md](07_parity
 | R-O1 | Operate | Short-lived result cache with single-flight, keyed by statement, binds and role; bounded memory |
 | R-O2 | Operate | `/metrics` (Prometheus text) for grepui itself: request counts, DB latency, cache hits, alert evaluations |
 | R-O3 | Operate | Graceful shutdown, connection pool limits, and `--read-only-user` check at startup that warns if the DB account can write |
+| R-AI1 | LLM | The traces table layout (flat trace v1 or JSON2 trace v2) is detected, and filters, trace detail, histogram and scatter work on both; attribute keys are bound parameters |
+| R-AI2 | LLM | The Connect page tells LLM SDKs (OpenInference, OTel GenAI) how to send to a trace v2 table: headers, Python, environment and collector snippets, and the notes a user needs (separate table, privacy, size) |
 | R-D1 | Delivery | `VERSION` is the single source; `Cargo.toml` matches; the binary reports it |
 | R-D2 | Delivery | The banned product name appears nowhere in the tree (`make no-banned-names`) |
 | R-D3 | Delivery | CI and release workflows pin every action to a commit SHA; release is tag-driven and the tag must equal `VERSION` |

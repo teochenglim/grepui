@@ -1,6 +1,6 @@
 # ARCH 08: LLM observability (OpenInference and OTel GenAI)
 
-Status: **roadmap, not scheduled.** This document records what was verified (2026-10-31), the design that follows from it, candidate requirements and the risks. It adds no requirement IDs to ARCH 00 yet: `make ac-map` requires every ID to be covered by an AC, so IDs are added when a release is written.
+Status: **step L1 built (v0.14.0, ADR 0015); L2 onward on the roadmap.** This document records what was verified (2026-10-31), the design that follows from it, candidate requirements and the risks. It adds no requirement IDs to ARCH 00 yet: `make ac-map` requires every ID to be covered by an AC, so IDs are added when a release is written.
 
 ## 1. What "store OpenInference traces" means for grepui
 
@@ -43,7 +43,7 @@ Instrumentations (README): Python (OpenAI, Anthropic, LangChain, LlamaIndex, DSP
 
 GreptimeDB's [data-model doc](https://docs.greptime.com/user-guide/traces/data-model) calls the trace pipeline section experimental. v1.3.0 notes: v2 uses a separate table ("Use a separate destination table from Trace V1"), existing v1 tables are not migrated, a v2 write to a v1 table is rejected, events and links stay JSON (`ARRAY(JSON2)` deferred). The JSON2 [deep dive](https://greptime.com/blogs/2026-09-23-greptimedb-json2-deep-dive.html) states bounded automatic shredding (`max_auto_expanded_paths`, default 100) with type hints settable only at CREATE time in 1.2. **Recommendation for LLM traces: trace v2 on GreptimeDB v1.3.0 or newer.**
 
-What grepui does **not** handle on v2 today (verified): the trace page's span panel returns empty attributes (it reads flat columns) and `q=tool.name=x` is rejected as "not a column". Everything else (list, scatter, histogram, waterfall, flame graph, logs pivot, SQL mode, JSON2 decoding) works on a v2 table.
+What grepui did not handle on v2 before v0.14.0 (verified; fixed by step L1, ADR 0015): the trace page's span panel returns empty attributes (it reads flat columns) and `q=tool.name=x` is rejected as "not a column". Everything else (list, scatter, histogram, waterfall, flame graph, logs pivot, SQL mode, JSON2 decoding) works on a v2 table.
 
 ## 4. Where this stands against the reference platform (from its own docs, not tested)
 

@@ -4,8 +4,8 @@ Status per release is in `RELEASE.md` (roll-up) and `RELEASE/` (detail). This fi
 
 ## Release train (planned releases 0.9 to 1.0)
 
-1. **0.1 to 0.13 are built** (foundation, logs, state and data health, traces, services and service map, metrics, rollups and retention, dashboards, alerts and incidents, pipelines/functions/enrichment/redaction); see `RELEASE.md`.
-2. **LLM track** (L1 onward) and **1.0 hardening**: next.
+1. **0.1 to 0.14 are built** (0.14 is LLM step L1) (foundation, logs, state and data health, traces, services and service map, metrics, rollups and retention, dashboards, alerts and incidents, pipelines/functions/enrichment/redaction); see `RELEASE.md`.
+2. **LLM track** (L2 onward) and **1.0 hardening**: next.
 3. **0.7 Rollups and extended retention** (D5): long windows and TTL tiers.
 4. **0.8 Dashboards, 0.9 Alerts and incidents, 0.10 Pipelines/functions/enrichment/redaction**: the parity modules.
 5. **0.11 Access control, multi-tenancy, SSO, audit; 0.12 Query management, work groups, federation; 0.13 Reports, RUM view, operate**: the enterprise tier.
@@ -31,14 +31,14 @@ Goal: read, search and analyse **OpenInference** (and OTel `gen_ai.*`) traces st
 | Step | Theme | What it delivers | Depends on |
 |---|---|---|---|
 | L0 | Platform | pin v1.3.0 (**done**), spike: OpenInference on trace v2 stored and queried (**done**, `ARCH/03`, `ARCH/08` section 3) | |
-| L1 | Trace layouts | detect flat (v1) vs JSON2 (v2) tables; attribute accessor used by filters, span panel, top values, detail; Connect page for LLM SDKs with the v2 headers | L0 |
+| L1 | Trace layouts | **built in 0.14** (ADR 0015): detect flat (v1) vs JSON2 (v2) tables; attribute accessor used by filters, span panel, detail; Connect page for LLM SDKs with the v2 headers | L0 |
 | L2 | LLM span views | kind badges and filters; chat transcript with tool calls; tokens and cost chips; retrieval documents; embeddings without vectors; long values collapsed; the normalised OpenInference and `gen_ai.*` model | L1 |
 | L3 | LLM analytics and sessions | tokens, cost, latency percentiles, error rate by model, tool and span kind; sessions and users; optional per-model price table | L2, rollup planner for long ranges |
 | L4 | Evaluations and annotations | read `annotation.*`, `evaluation.*`, `gen_ai.evaluation.result`; human feedback stored in `grepui_*` | L2, state store |
 | L5 | Agent graph | from `graph.node.*`, `agent.name` and parentage (Apache-2.0; the reference platform lists its agent graph as Enterprise and Cloud) | L2 |
 | L6 | Operate | content protection (redaction by role, size caps), alerts on cost, tokens and error rate | access control (0.11), alerts (0.9), redaction (0.10) |
 
-Unverified and needing a spike before L1 ships: sending from the real Phoenix and OpenInference SDKs to GreptimeDB's OTLP endpoint with the pipeline headers; the Phoenix project-name attribute.
+Verified in the L1 spike (v0.14): the real OpenTelemetry SDK with the OpenInference OpenAI instrumentor sends to GreptimeDB's OTLP endpoint with the v2 pipeline headers, and the project is the resource attribute `openinference.project.name`. Still untested: the `arize-phoenix-otel` package itself.
 
 ## After 1.0 (not scheduled)
 

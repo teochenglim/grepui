@@ -91,7 +91,26 @@ pub struct Waterfall {
     pub end_ns: i64,
 }
 
-/// Attributes live in flat columns: `span_attributes.<k>` and `resource_attributes.<k>`.
+/// The longest attribute value sent to the browser. An LLM prompt can be hundreds of kilobytes;
+/// the rest is cut with a note saying how much there was (R-AI8 will let a role see it whole).
+pub const ATTR_VALUE_MAX: usize = 32 * 1024;
+
+fn capped(v: &Value) -> Value {
+    match v {
+        Value::String(s) if s.len() > ATTR_VALUE_MAX => {
+            let mut cut = ATTR_VALUE_MAX;
+            while !s.is_char_boundary(cut) {
+                cut -= 1;
+            }
+            Value::String(format!("{}… [cut: {} bytes in all]", &s[..cut], s.len()))
+        }
+        other => other.clone(),
+    }
+}
+
+/// Attributes of either layout. Flat tables keep one column per attribute
+/// (`span_attributes.<k>`, `resource_attributes.<k>`); JSON tables hold them as objects in the
+/// `span_attributes` and `resource_attributes` columns, keyed by the dotted name.
 fn extract(raw: &Value) -> (Map<String, Value>, Map<String, Value>) {
     let (mut attrs, mut res) = (Map::new(), Map::new());
     if let Some(o) = raw.as_object() {
@@ -99,10 +118,28 @@ fn extract(raw: &Value) -> (Map<String, Value>, Map<String, Value>) {
             if v.is_null() {
                 continue;
             }
-            if let Some(n) = k.strip_prefix("span_attributes.") {
-                attrs.insert(n.to_string(), v.clone());
-            } else if let Some(n) = k.strip_prefix("resource_attributes.") {
-                res.insert(n.to_string(), v.clone());
+            match (k.as_str(), v) {
+                ("span_attributes", Value::Object(m)) => {
+                    attrs.extend(
+                        m.iter()
+                            .filter(|(_, v)| !v.is_null())
+                            .map(|(k, v)| (k.clone(), capped(v))),
+                    );
+                }
+                ("resource_attributes", Value::Object(m)) => {
+                    res.extend(
+                        m.iter()
+                            .filter(|(_, v)| !v.is_null())
+                            .map(|(k, v)| (k.clone(), capped(v))),
+                    );
+                }
+                _ => {
+                    if let Some(n) = k.strip_prefix("span_attributes.") {
+                        attrs.insert(n.to_string(), capped(v));
+                    } else if let Some(n) = k.strip_prefix("resource_attributes.") {
+                        res.insert(n.to_string(), capped(v));
+                    }
+                }
             }
         }
     }

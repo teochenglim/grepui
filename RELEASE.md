@@ -2,7 +2,7 @@
 
 The single place to see where grepui stands: what is shipped, what is planned, what each release proves, and how a release is cut. Per-release detail (scope, acceptance criteria, named tests, checklist) lives in [`RELEASE/vX.Y.Z.md`](RELEASE/README.md); this file is the readable roll-up and the changelog.
 
-> **Current state:** v0.1.0 to v0.13.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.12.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
+> **Current state:** v0.1.0 to v0.14.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.12.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
 
 ## 1. Summary
 
@@ -13,19 +13,20 @@ grepui is a multi-tenant observability UI for GreptimeDB: one Rust binary (axum)
 | Language / runtime | Rust (edition 2024), axum 0.8, sqlx (MySQL protocol to GreptimeDB), no Node anywhere |
 | Pinned GreptimeDB | `v1.3.0` (`GREPTIME_VERSION` in the Makefile, the compose file, CI); v1.2.x is unsupported |
 | Tenancy | Multi-tenant from v0.1.0: org-scoped routes; orgs map to GreptimeDB databases |
-| Releases planned | 14 (v0.1.0 to v0.13.0, then v1.0.0) |
-| Requirements | 78 (`ARCH/00_requirements_traceability.md`) |
+| Releases planned | 15 (v0.1.0 to v0.14.0, then v1.0.0) |
+| Requirements | 80 (`ARCH/00_requirements_traceability.md`) |
 | Acceptance criteria | 82, each governed by at least two named tests (`make ac-map`) |
 | Licence | Apache-2.0 |
 | Artifacts per tag | tarballs for linux and macOS on amd64 and arm64 (with `.sha256`), multi-arch image on GHCR, GitHub Release with the notes from `RELEASE/<tag>.md` |
 
 ## 2. Release status
 
-Latest built: **v0.13.0: Reports, RUM view and operate** (ready). Newest first.
+Latest built: **v0.14.0: LLM traces, step L1** (ready). Newest first.
 
 | Release | Theme | Status | ACs | Requirements covered |
 |---|---|---|---|---|
 | [v1.0.0](RELEASE/v1.0.0.md) | Launch hardening | planned | 2 | R-C2 R-F4 R-Q1 |
+| [v0.14.0](RELEASE/v0.14.0.md) | LLM traces, step L1 (trace layouts and Connect) | ready | 2 | R-AI1 R-AI2 |
 | [v0.13.0](RELEASE/v0.13.0.md) | Reports, RUM view and operate | ready | 5 | R-E1 R-O1 R-O2 R-O3 R-U1 |
 | [v0.12.0](RELEASE/v0.12.0.md) | Query management, work groups and federation | ready | 5 | R-W1 R-W2 R-W3 R-Y1 R-Y2 |
 | [v0.11.0](RELEASE/v0.11.0.md) | Access control, multi-tenancy, SSO and audit | ready | 7 | R-C1 R-C2 R-C3 R-C4 R-C5 R-C6 |
@@ -60,6 +61,12 @@ Newest first. An entry is written when a release becomes `ready`; the same text 
 ### Unreleased
 
 - Requirements, architecture, positioning and parity matrix (ARCH 00–07), release plan with ACs for v0.1.0–v1.0.0, `scripts/seed.py` (demo traces and logs over OTLP/protobuf, `--db` per org).
+
+### v0.14.0: LLM traces, step L1 (ready)
+
+Added: the traces table layout is detected (flat `greptime_trace_v1` or JSON2 `greptime_trace_v2`, GreptimeDB v1.3.0+) and filters, trace detail, histogram, scatter and the span panel work on both; on a JSON table any attribute name can be filtered (`llm.model_name=gpt-4o`, `openinference.span.kind=TOOL`, `resource.openinference.project.name=...`), the key travelling as a bound JSON path; attribute values over 32 KiB are cut in the detail view; the Connect page gets an LLM section (v2 headers, Python with the OpenInference OpenAI instrumentor, environment and collector snippets, notes on a separate table, privacy and size); `playground --llm-data` seeds OpenInference-shaped traces into a v2 table; the Traces page shows a JSON-attributes badge (ADR 0015).
+
+No schema change, no new dependency, no new flag except the playground's `--llm-data`. Limits: not tested with `arize-phoenix-otel` itself (the OpenTelemetry exporter and the OpenInference OpenAI instrumentor were); an org reads one traces table from its own database, so LLM traces need their own org and database (or `--traces-table`); the Services page counts server and consumer spans for RED, and OpenInference spans are internal, so rates read 0 (step L3); LLM-aware views are step L2.
 
 ### v0.13.0: Reports, RUM view and operate (ready)
 
@@ -183,6 +190,7 @@ Honest ledger of what has actually been run. Updated as releases land.
 | OpenInference spans on trace v2 (JSON2) | spike on v1.3.0: stored with 19 fixed columns (300 indexed messages and a 200 KB prompt in one span), queried with `json_get_*(col, '["key"]')`; grepui's trace list/waterfall/logs work on a v2 table, its span panel and attribute filters do not yet (roadmap LLM track L1) |
 | CI-parity run (fresh `make db-down db-up`, seed, `make test-db`) | green for every live test after the v0.4.0 fixes; it reproduced the v0.3.0 CI failure and found the join bug below |
 | **GreptimeDB v1.2.1: `IN (subquery)`, `EXISTS` and self-joins on a telemetry table return wrong, nondeterministic rows** | verified live (4 / 6 / 5 / 0 for a true 33); no such query is used (ADR 0007); the v0.5.0 dependency self-join is verified correct on v1.3.0 (`ac_0_5_3_dependencies_live`) |
+| Trace layouts and LLM Connect (v0.14.0): flat and JSON2 trace tables, attribute filters, span panel, Connect headers | verified live on GreptimeDB v1.3.0 (a generated OpenInference batch sent to a v2 table and filtered by model, span kind, a numeric attribute, a substring and the project, each against counts taken from the batch; the Connect headers accepted and a v1 header refused on the same table); the real OpenTelemetry SDK with the OpenInference OpenAI instrumentor sent to a v2 table by hand; in a browser. Not exercised: `arize-phoenix-otel`, a v1 and a v2 table in one organisation's workflow beyond the tests |
 | Reports, RUM, cache, metrics, shutdown, read-only check (v0.13.0): report render and mail, once per slot between two schedulers, failures recorded, six identical concurrent reads hit the database once, TTL and bounds, metrics counters move, in-flight request survives shutdown | verified live for RUM (exact counts of page views, sessions, visitors, INP ratings, error groups against known rows in a throwaway database); the rest offline with fakes; in a browser: RUM tabs on real data, Reports page, and a real 200 KB HTML email through a local SMTP sink (found and fixed the 998-character line limit). Not exercised: a real mail provider, two real processes sharing a store for the once-per-slot claim, SIGTERM on a container, `--read-only-user` against a genuinely read-only GreptimeDB account |
 | Query management and federation (v0.12.0): work-group quotas, running list and cancel, statistics, fan-out merge, source RBAC and disable | verified live (a cross join of a seeded log table shows in `information_schema.process_list` and matches grepui's statement text; a real `KILL` removes the process and ends the read; grepui-side cancel is prompt; a twin source over the same data returns exactly twice the rows, newest first); browser pass on Queries, Work groups, Sources and the Logs source picker. Not exercised: two genuinely separate clusters, more than one replica sharing a source switch |
 | Access control (v0.11.0): sessions, deny by default over every route, isolation matrix across two orgs, tokens, audit, org create/delete cascade | verified live (first admin once, cross-org blocking, a real `CREATE DATABASE`, the cascade, audit search) and in a browser (sign-in, administration, tokens, audit, platform orgs); OIDC verified against a local stand-in provider with generated keys, not a real one; the TLS client verified against example.com and a wrong-host certificate; the SSO redirect in a browser not exercised |

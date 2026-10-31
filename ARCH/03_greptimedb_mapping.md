@@ -33,7 +33,7 @@ Written from docs, not yet executed (see AGENTS.md rule on testing against the p
 - `matches_term(body, 'x')` and `json_get_string(log_attributes, 'key')`; dotted keys may need path syntax.
 - The parent/child join in `dependencies` on large ranges; a Flow sink may be needed.
 - Flow DDL in `scripts/rollup.sql`.
-- Not supported yet: the `greptime_trace_v2` schema (JSON2 attribute columns).
+- The `greptime_trace_v2` schema (JSON2 attribute columns) is read since v0.14.0 (ADR 0015): the layout is detected and attribute filters and the span panel work on it.
 
 Each is one function in the query builders, so a dialect fix is a small edit. `_live` tests (`make test-db`) cover each in the release that needs it.
 
@@ -78,4 +78,4 @@ Each is one function in the query builders, so a dialect fix is a small edit. `_
 | OpenInference-shaped spans (181 spans, 308 KB OTLP request) | stored; includes a span with 300 indexed messages and a 200 KB prompt: no new columns, point read of message 299 in about 30 ms |
 | Aggregations over JSON2 | tokens and cost by model, span-kind mix, sessions, p95 latency, project name from `resource_attributes` all work |
 | Existing v1 tables | not migrated automatically ("Existing Trace V1 tables are not automatically migrated"); a v2 write to a v1 table is rejected |
-| grepui trace detail and attribute filters on a v2 table | **do not work yet**: the span panel returns empty attributes (it reads flat columns) and `q=tool.name=...` is rejected as an unknown column. Roadmap: LLM track, step L1 |
+| grepui trace detail and attribute filters on a v2 table | **work since v0.14.0** (ADR 0015): attributes are objects keyed by the dotted name, filters use `json_get_string(col, '["key"]')` with the path bound (it renders numbers and booleans as text); verified with a generated OpenInference batch and with the real OpenTelemetry SDK plus the OpenInference OpenAI instrumentor |

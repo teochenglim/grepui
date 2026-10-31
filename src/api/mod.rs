@@ -468,6 +468,7 @@ pub const ROUTES: &[&str] = &[
     "/api/v1/orgs/{org}/enrichment/{name}/join",
     "/api/v1/orgs/{org}/redaction",
     "/api/v1/orgs/{org}/redaction/{id}",
+    "/api/v1/orgs/{org}/traces/layout",
     "/api/v1/orgs/{org}/rum/status",
     "/api/v1/orgs/{org}/rum/sites",
     "/api/v1/orgs/{org}/rum/overview",
@@ -930,6 +931,7 @@ pub fn router(state: Shared) -> Router {
             "/api/v1/orgs/{org}/metrics/{name}/labels",
             get(metrics::labels),
         )
+        .route("/api/v1/orgs/{org}/traces/layout", get(traces::layout_info))
         .route("/api/v1/orgs/{org}/traces", get(traces::list))
         .route(
             "/api/v1/orgs/{org}/traces/histogram",

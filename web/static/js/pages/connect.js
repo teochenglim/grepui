@@ -13,6 +13,21 @@ const SNIPPETS = [
   ['check_tables', 'Check tables'],
 ];
 
+// LLM applications (OpenInference, OTel GenAI): their own trace v2 table.
+function llmCard(l) {
+  const LL = [['python', 'Python (OpenInference)'], ['sdk_env', 'SDK environment'], ['otel_collector', 'OTel Collector']];
+  const body = h('div');
+  const tabs = h('div', { class: 'tabs', role: 'tablist' });
+  const paint = (key) => {
+    mount(tabs, LL.map(([k, label]) => h('button', { class: 'tab', role: 'tab', 'aria-selected': String(k === key), onclick: () => paint(k) }, label)));
+    mount(body, copybox(l[key]));
+  };
+  paint('python');
+  return h('div', { class: 'card stack' }, h('h2', null, 'LLM applications'),
+    h('p', { class: 'muted' }, `OpenInference and OTel GenAI spans go to their own trace v2 table, ${l.table}. Verified with the OpenTelemetry SDK and the OpenInference OpenAI instrumentor.`),
+    h('ul', null, l.notes.map((n) => h('li', null, n))), tabs, body);
+}
+
 export async function connectPage(view) {
   view.append(stateBox('Loading…'));
   const [{ data: c }, streams] = await Promise.all([api.get('connect'), api.get('streams').catch(() => null)]);
@@ -42,5 +57,6 @@ export async function connectPage(view) {
         h('td', null, Object.entries(e.headers).map(([k, v]) => h('div', null, h('code', null, `${k}: ${v}`)))),
       )))))),
     h('div', { class: 'card' }, h('h2', null, 'Snippets'), tabs, out),
+    llmCard(c.llm),
   );
 }

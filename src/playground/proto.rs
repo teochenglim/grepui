@@ -44,17 +44,54 @@ fn attr(k: &str, v: &AttrVal) -> Vec<u8> {
     let any = match v {
         AttrVal::Str(s) => f_str(1, s),
         AttrVal::Int(i) => f_var(3, *i as u64),
+        AttrVal::Float(f) => f_fix64(4, f.to_bits()),
+        AttrVal::Bool(b) => f_var(2, u64::from(*b)),
     };
     [f_str(1, k), f_bytes(2, &any)].concat()
 }
 
 fn resource(service: &str) -> Vec<u8> {
+    resource_with(service, &[])
+}
+
+fn resource_with(service: &str, extra: &[(&str, AttrVal)]) -> Vec<u8> {
     let attrs = [
         f_bytes(1, &attr("service.name", &AttrVal::Str(service.into()))),
         f_bytes(1, &attr("service.version", &AttrVal::Str("1.4.2".into()))),
+        extra
+            .iter()
+            .flat_map(|(k, v)| f_bytes(1, &attr(k, v)))
+            .collect::<Vec<u8>>(),
     ]
     .concat();
     f_bytes(1, &attrs)
+}
+
+/// ExportTraceServiceRequest for any services in the batch, with extra resource attributes (an
+/// OpenInference project name, for instance).
+pub fn encode_spans(b: &Batch, extra: &[(&str, AttrVal)]) -> Vec<u8> {
+    let mut services: Vec<&str> = b.spans.iter().map(|s| s.service).collect();
+    services.sort_unstable();
+    services.dedup();
+    services
+        .iter()
+        .flat_map(|svc| {
+            let spans: Vec<u8> = b
+                .spans
+                .iter()
+                .filter(|s| s.service == *svc)
+                .flat_map(|s| f_bytes(2, &span(s)))
+                .collect();
+            f_bytes(
+                1,
+                &[
+                    resource_with(svc, extra),
+                    f_bytes(2, &[scope(), spans].concat()),
+                ]
+                .concat(),
+            )
+        })
+        .collect()
 }
 
 fn scope() -> Vec<u8> {

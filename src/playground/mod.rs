@@ -65,6 +65,8 @@ pub struct Opts {
     pub seed: u64,
     pub live: bool,
     pub force: bool,
+    /// Also seed OpenInference LLM traces into a trace v2 table called `llm_traces`.
+    pub llm_data: bool,
 }
 
 fn now_ns() -> u64 {
@@ -115,6 +117,42 @@ pub async fn send(
         bail!(
             "GreptimeDB rejected the demo logs (HTTP {code}): {}",
             body.chars().take(200).collect::<String>()
+        );
+    }
+    Ok(())
+}
+
+/// Send spans to a **trace v2** table (`greptime_trace_v2`, JSON2 attribute columns; needs
+/// GreptimeDB v1.3.0 or newer), with an OpenInference project name on the resource.
+pub async fn send_llm_traces(
+    http: &str,
+    db: &str,
+    table: &str,
+    project: &str,
+    b: &synth::Batch,
+) -> Result<()> {
+    let (code, body) = http::post(
+        http,
+        "/v1/otlp/v1/traces",
+        &[
+            ("content-type", "application/x-protobuf"),
+            ("x-greptime-db-name", db),
+            ("x-greptime-pipeline-name", "greptime_trace_v2"),
+            ("x-greptime-trace-table-name", table),
+        ],
+        &proto::encode_spans(
+            b,
+            &[(
+                "openinference.project.name",
+                synth::AttrVal::Str(project.into()),
+            )],
+        ),
+    )
+    .await?;
+    if code != 200 {
+        bail!(
+            "GreptimeDB rejected the LLM traces (HTTP {code}): {}",
+            body.chars().take(300).collect::<String>()
         );
     }
     Ok(())
@@ -342,6 +380,17 @@ pub async fn prepare(cfg: &Config, o: &Opts) -> Result<()> {
         let to = now_ns();
         let from = to.saturating_sub(o.minutes * 60 * 1_000_000_000);
         send_metrics(&o.http, &db, &synth::generate_metrics(from, to)).await?;
+    }
+    if o.llm_data {
+        let db = cfg.database()?;
+        if has_traces(reader.as_ref(), &db, "llm_traces").await {
+            tracing::info!(%db, "playground: LLM traces already present, not seeding");
+        } else {
+            ident(&db)?;
+            let b = synth::generate_llm(o.seed, 80, now_ns(), o.minutes);
+            tracing::info!(%db, spans = b.spans.len(), "playground: seeding LLM traces into llm_traces (trace v2)");
+            send_llm_traces(&o.http, &db, "llm_traces", synth::LLM_PROJECT, &b).await?;
+        }
     }
     if o.live {
         let (http, db, tt, lt, seed) = (

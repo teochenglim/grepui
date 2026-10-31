@@ -1,7 +1,11 @@
-//! Trace query builders (R-R1 – R-R3, R-R6). Table names are validated identifiers; every filter
-//! value, service name, trace id and timestamp is a bound parameter. Attribute columns are
-//! flat columns named `span_attributes.<key>` (verified live); a key is only used after it has
-//! been matched against the table's real column list.
+//! Trace query builders (R-R1 – R-R3, R-R6, R-AI1). Table names are validated identifiers; every
+//! filter value, attribute key, service name, trace id and timestamp is a bound parameter.
+//!
+//! A traces table has one of two layouts (ADR 0015). **Flat** (`greptime_trace_v1`): one column
+//! per attribute, named `span_attributes.<key>`; a key is only used after it has been matched
+//! against the table's real column list. **Json** (`greptime_trace_v2`, GreptimeDB v1.3.0+): three
+//! JSON2 columns `span_attributes`, `scope_attributes`, `resource_attributes`; a key is read with
+//! `json_get_string(col, '["key"]')` where the path is a bound parameter, so any key works.
 
 use super::{
     Bind, DAY_MS, Q, Window,
@@ -17,12 +21,40 @@ pub const TS: &str = "`timestamp`";
 const ERR_SQL: &str = "`span_status_code` = 'STATUS_CODE_ERROR'";
 const ROOT_SQL: &str = "(`parent_span_id` IS NULL OR `parent_span_id` = '')";
 
-/// A resolved column a condition points at: a fixed plain column, or a real attribute column.
+/// How a traces table stores attributes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Layout {
+    /// One column per attribute (`span_attributes.<key>`).
+    Flat,
+    /// JSON2 attribute columns.
+    Json,
+}
+
+impl Layout {
+    /// A table with a column named exactly `span_attributes` is the JSON layout; the flat layout
+    /// has only `span_attributes.<key>` columns.
+    pub fn detect(columns: &[String]) -> Layout {
+        if columns.iter().any(|c| c == "span_attributes") {
+            Layout::Json
+        } else {
+            Layout::Flat
+        }
+    }
+}
+
+/// A resolved column a condition points at: a fixed plain column, or an attribute.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TCol {
     Plain(&'static str),
-    /// Full column name, e.g. `span_attributes.http.route`; compared as text.
+    /// Flat layout: full column name, e.g. `span_attributes.http.route`; compared as text.
     Attr(String),
+    /// Json layout: an attribute of `span_attributes` or `resource_attributes`, read as text
+    /// (numbers and booleans too: `json_get_string` renders them).
+    Json {
+        col: &'static str,
+        key: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -76,8 +108,15 @@ fn safe_column(name: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'-'))
 }
 
-/// Map filter-bar keys to columns, validating attribute keys against the table's real columns.
+/// A key that can travel as a JSON path: printable, not too long.
+fn json_key_ok(k: &str) -> bool {
+    !k.is_empty() && k.chars().count() <= 200 && !k.chars().any(char::is_control)
+}
+
+/// Map filter-bar keys to columns, validating attribute keys against the table's real columns
+/// (flat layout) or for shape only (JSON layout, where any key can be asked for).
 pub fn resolve(parsed: &Parsed, columns: &[String]) -> Result<Vec<RCond>, ApiError> {
+    let layout = Layout::detect(columns);
     let mut out = vec![];
     for c in &parsed.conds {
         let plain = match c.key.as_str() {
@@ -97,6 +136,30 @@ pub fn resolve(parsed: &Parsed, columns: &[String]) -> Result<Vec<RCond>, ApiErr
                 col: TCol::Plain(p),
                 op: c.op,
                 value: shorthand(p, &c.value),
+            });
+            continue;
+        }
+        if layout == Layout::Json {
+            let (col, k) = if let Some(k) = c
+                .key
+                .strip_prefix("resource.")
+                .or_else(|| c.key.strip_prefix("resource_attributes."))
+            {
+                ("resource_attributes", k)
+            } else {
+                let k = c.key.strip_prefix("span_attributes.").unwrap_or(&c.key);
+                ("span_attributes", k.strip_prefix("attr.").unwrap_or(k))
+            };
+            if !json_key_ok(k) {
+                return Err(ApiError::bad(format!("invalid attribute name {:?}", c.key)));
+            }
+            out.push(RCond {
+                col: TCol::Json {
+                    col,
+                    key: k.to_string(),
+                },
+                op: c.op,
+                value: c.value.clone(),
             });
             continue;
         }
@@ -129,25 +192,33 @@ pub fn resolve(parsed: &Parsed, columns: &[String]) -> Result<Vec<RCond>, ApiErr
     Ok(out)
 }
 
-fn expr(c: &TCol) -> String {
+/// The text of a column and the binds it needs (a JSON attribute binds its path).
+fn expr(c: &TCol) -> (String, Vec<Bind>) {
     match c {
-        TCol::Plain(n) => format!("`{n}`"),
-        TCol::Attr(n) => format!("CAST(`{n}` AS STRING)"),
+        TCol::Plain(n) => (format!("`{n}`"), vec![]),
+        TCol::Attr(n) => (format!("CAST(`{n}` AS STRING)"), vec![]),
+        TCol::Json { col, key } => (
+            format!("json_get_string(`{col}`, ?)"),
+            vec![Bind::Str(logs::json_path(key))],
+        ),
     }
 }
 
-fn cond_sql(c: &RCond) -> (String, Bind) {
-    let x = expr(&c.col);
+fn cond_sql(c: &RCond) -> (String, Vec<Bind>) {
+    let (x, mut binds) = expr(&c.col);
     match c.op {
-        Op::Eq => (format!("{x} = ?"), Bind::Str(c.value.clone())),
-        Op::Ne => (
-            format!("COALESCE({x}, '') != ?"),
-            Bind::Str(c.value.clone()),
-        ),
-        Op::Like => (
-            format!("{x} LIKE ?"),
-            Bind::Str(format!("%{}%", like_escape(&c.value))),
-        ),
+        Op::Eq => {
+            binds.push(Bind::Str(c.value.clone()));
+            (format!("{x} = ?"), binds)
+        }
+        Op::Ne => {
+            binds.push(Bind::Str(c.value.clone()));
+            (format!("COALESCE({x}, '') != ?"), binds)
+        }
+        Op::Like => {
+            binds.push(Bind::Str(format!("%{}%", like_escape(&c.value))));
+            (format!("{x} LIKE ?"), binds)
+        }
     }
 }
 
@@ -166,7 +237,7 @@ fn span_pred(f: &TraceFilter) -> Option<(String, Vec<Bind>)> {
     for c in &f.conds {
         let (s, b) = cond_sql(c);
         parts.push(s);
-        binds.push(b);
+        binds.extend(b);
     }
     for t in &f.terms {
         parts.push("`span_name` LIKE ?".into());

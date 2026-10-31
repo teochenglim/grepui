@@ -50,6 +50,10 @@ enum Cmd {
         /// Seed even if the database already has traces (doubles the data).
         #[arg(long)]
         force: bool,
+        /// Also seed OpenInference LLM traces into a trace v2 table named llm_traces (needs
+        /// GreptimeDB v1.3.0+). Create an org with that traces table to browse them.
+        #[arg(long)]
+        llm_data: bool,
     },
     /// Exit 0 when a running grepui answers /healthz (container health check).
     Healthcheck {
@@ -78,6 +82,7 @@ async fn main() -> Result<()> {
             seed,
             no_live,
             force,
+            llm_data,
         } => {
             let http = greptime_http.unwrap_or_else(|| cfg.greptime_http_public.clone());
             let opts = playground::Opts {
@@ -89,6 +94,7 @@ async fn main() -> Result<()> {
                 seed,
                 live: !no_live,
                 force,
+                llm_data,
             };
             playground::prepare(&cfg, &opts).await?;
             server::serve(*cfg).await

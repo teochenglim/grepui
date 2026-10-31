@@ -82,7 +82,10 @@ export async function tracesPage(view) {
     }
   });
 
-  mount(view, h('div', { class: 'page-head' }, h('h2', null, 'Traces'), h('span', { class: 'sub' }, 'one row per trace')), bar.el, h('div', { class: 'grid2' }, histBox, scatBox), results);
+  // Which attribute layout the table has: JSON tables (trace v2, LLM data) accept any attribute name in the filter.
+  const layoutBadge = h('span', { class: 'badge', hidden: true });
+  api.get('traces/layout').then(({ data }) => { if (data.layout === 'json') { mount(layoutBadge, 'JSON attributes (trace v2)'); layoutBadge.title = 'Filter on any attribute, e.g. llm.model_name=gpt-4o or openinference.span.kind=TOOL'; layoutBadge.hidden = false; } }).catch(() => {});
+  mount(view, h('div', { class: 'page-head' }, h('h2', null, 'Traces'), h('span', { class: 'sub' }, 'one row per trace'), layoutBadge), bar.el, h('div', { class: 'grid2' }, histBox, scatBox), results);
   load();
   void navigate;
 }

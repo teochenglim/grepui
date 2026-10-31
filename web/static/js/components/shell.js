@@ -29,7 +29,7 @@ const LIVE = [
   ['connect', 'Connect'],
 ];
 const SOON = [
-  ['LLM traces', 'L1'],
+  ['LLM span views', 'L2'],
 ];
 
 /** Who is signed in, with sign-out (R-C1). With --no-auth there is nobody to sign out. */
