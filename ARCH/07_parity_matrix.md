@@ -61,13 +61,13 @@ Status: `planned` (requirement ID and release; a row whose release is `ready` or
 | Feature | Evidence | Edition | grepui | Notes |
 |---|---|---|---|---|
 | Folders, dashboards, tabs; move; manage | read | | planned R-B1, R-B5, 0.8 | |
-| Panel types: area, stacked area, bars (v/h, stacked), line, scatter, pie, donut, heatmap, metric text, gauge, table, geo map, maps, sankey, markdown, HTML | read | | planned R-B2, 0.8 | Table has pivot mode |
+| Panel types: area, stacked area, bars (v/h, stacked), line, scatter, pie, donut, heatmap, metric text, gauge, table, geo map, maps, sankey, markdown, HTML | read | | built R-B2, 0.8 | Table has pivot mode |
 | Custom Charts | read | | gap, deliberate | Would run arbitrary user JavaScript |
-| Time range, auto run/refresh, refresh key | read | | planned R-B4, 0.8 | |
-| Import dashboard from JSON | read | | planned R-B5, 0.8 | |
-| Variables and filters | nav | | planned R-B3, 0.8 | Values bound as parameters |
-| Public dashboards, TV mode, TV playlist | nav | | planned R-B6, 0.8 | |
-| Comparison against past period | nav | | planned R-B4, 0.8 | |
+| Time range, auto run/refresh, refresh key | read | | built R-B4, 0.8 | |
+| Import dashboard from JSON | read | | built R-B5, 0.8 | |
+| Variables and filters | nav | | built R-B3, 0.8 | Values bound as parameters |
+| Public dashboards, TV mode, TV playlist | nav | | built R-B6, 0.8 | |
+| Comparison against past period | nav | | built R-B4, 0.8 | |
 | Histogram caching | nav | | planned R-O1, 0.13 | |
 | Annotation sources, folder icons, drilldowns | nav / unconfirmed | | gap | Re-check docs; revisit after 1.0 |
 | Grafana dashboard import | unconfirmed | | gap | |

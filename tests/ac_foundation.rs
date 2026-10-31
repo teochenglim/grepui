@@ -256,6 +256,9 @@ fn fill(route: &str) -> String {
         .replace("{field}", "severity_text")
         .replace("{service}", "cart")
         .replace("{template}", "traces_red")
+        .replace("{panel}", "p1")
+        .replace("{share}", "0123456789abcdef")
+        .replace("{token}", "0123456789abcdef0123456789abcdef")
         .replace("{stream}", "traces")
         .replace("{id}", "0123456789abcdef")
         .replace("{trace_id}", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -284,16 +287,21 @@ async fn ac_0_1_4_every_listed_route_exists() {
     let a = app(Fake::new(sample_db));
     for route in ROUTES {
         let r = get(&a, &format!("{}?from=1000&to=2000", fill(route))).await;
-        assert_ne!(
-            r.status,
-            StatusCode::NOT_FOUND,
+        // A handler may answer 404 with a JSON error ("no such dashboard"); an unrouted path
+        // answers 404 with no body.
+        assert!(
+            r.status != StatusCode::NOT_FOUND || r.json().get("error").is_some(),
             "{route} is listed but not routed"
         );
-        // Write-only routes (PUT/DELETE) answer GET with 405 by design.
+        // Write-only routes (PUT/DELETE/POST) answer GET with 405 by design.
         let write_only = route.ends_with("/annotation")
             || route.ends_with("/rollups/{template}")
             || route.ends_with("/backfill")
-            || route.ends_with("/retention/{stream}");
+            || route.ends_with("/retention/{stream}")
+            || route.ends_with("/import")
+            || route.ends_with("/move")
+            || route.ends_with("/shares/{share}")
+            || route.ends_with("/folders/{id}");
         if !write_only {
             assert_ne!(r.status, StatusCode::METHOD_NOT_ALLOWED, "{route}");
         }
@@ -342,7 +350,10 @@ fn ac_0_1_4_write_allowlist_is_pinned() {
             "grepui_schema",
             "grepui_views",
             "grepui_history",
-            "grepui_services"
+            "grepui_services",
+            "grepui_folders",
+            "grepui_dashboards",
+            "grepui_shares"
         ]
     );
 }

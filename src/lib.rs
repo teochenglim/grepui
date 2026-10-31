@@ -4,6 +4,7 @@
 pub mod admin;
 pub mod api;
 pub mod config;
+pub mod dash;
 pub mod error;
 pub mod layout;
 pub mod org;

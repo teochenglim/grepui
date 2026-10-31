@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "time": {"range": "1h"},
+  "refresh": "30s",
+  "variables": [
+    {"name": "service", "label": "Service", "kind": "query", "multi": true,
+     "query": "SELECT DISTINCT service_name FROM opentelemetry_traces WHERE timestamp >= $__from AND timestamp < $__to ORDER BY 1"}
+  ],
+  "tabs": [
+    {"id": "overview", "title": "Overview", "panels": [
+      {"id": "spans", "type": "stat", "title": "Spans", "w": 3, "h": 2,
+       "query": {"kind": "sql", "text": "SELECT count(*) AS spans FROM opentelemetry_traces WHERE timestamp >= $__from AND timestamp < $__to AND service_name IN ($service)"}},
+      {"id": "errors", "type": "stat", "title": "Errors", "w": 3, "h": 2,
+       "query": {"kind": "sql", "text": "SELECT count(*) AS errors FROM opentelemetry_traces WHERE timestamp >= $__from AND timestamp < $__to AND service_name IN ($service) AND span_status_code = 'STATUS_CODE_ERROR'"}},
+      {"id": "cpu", "type": "gauge", "title": "Average CPU", "w": 3, "h": 2, "options": {"unit": "%", "min": 0, "max": 100, "decimals": 0},
+       "query": {"kind": "promql", "text": "avg(process_cpu_utilization) * 100"}},
+      {"id": "p95", "type": "stat", "title": "Slowest span", "w": 3, "h": 2, "options": {"unit": "ms", "decimals": 1},
+       "query": {"kind": "sql", "text": "SELECT max(CAST(timestamp_end AS BIGINT) - CAST(timestamp AS BIGINT)) / 1000000.0 AS slowest FROM opentelemetry_traces WHERE timestamp >= $__from AND timestamp < $__to AND service_name IN ($service)"}},
+      {"id": "rate", "type": "line", "title": "Request rate by service", "w": 8, "h": 4, "options": {"unit": "req/s"},
+       "query": {"kind": "promql", "text": "sum by (service_name) (rate(http_server_request_count_total[2m]))"}},
+      {"id": "classes", "type": "stacked_area", "title": "Requests by status class", "w": 4, "h": 4,
+       "query": {"kind": "promql", "text": "sum by (http_status_class) (rate(http_server_request_count_total[2m]))"}},
+      {"id": "cpu-bars", "type": "bar_h", "title": "CPU by service", "w": 4, "h": 3, "options": {"unit": "%", "decimals": 0},
+       "query": {"kind": "promql", "text": "process_cpu_utilization * 100"}},
+      {"id": "by-service", "type": "pie", "title": "Spans by service", "w": 4, "h": 3,
+       "query": {"kind": "sql", "text": "SELECT service_name, count(*) AS spans FROM opentelemetry_traces WHERE timestamp >= $__from AND timestamp < $__to AND service_name IN ($service) GROUP BY 1 ORDER BY 2 DESC"}},
+      {"id": "err-donut", "type": "donut", "title": "Errors by service", "w": 4, "h": 3,
+       "query": {"kind": "sql", "text": "SELECT service_name, count(*) AS errors FROM opentelemetry_traces WHERE timestamp >= $__from AND timestamp < $__to AND span_status_code = 'STATUS_CODE_ERROR' GROUP BY 1 ORDER BY 2 DESC"}}
+    ]},
+    {"id": "traces", "title": "Traces", "panels": [
+      {"id": "pivot", "type": "table", "title": "Spans by service and status (pivot)", "w": 6, "h": 4,
+       "options": {"pivot": {"row": "service_name", "column": "status", "value": "spans"}},
+       "query": {"kind": "sql", "text": "SELECT service_name, span_status_code AS status, count(*) AS spans FROM opentelemetry_traces WHERE timestamp >= $__from AND timestamp < $__to GROUP BY 1, 2 ORDER BY 1"}},
+      {"id": "heat", "type": "heatmap", "title": "Spans per minute and service", "w": 6, "h": 4,
+       "query": {"kind": "sql", "text": "SELECT CAST(date_bin('1 minute'::INTERVAL, timestamp) AS BIGINT) / 1000000 AS minute, service_name, count(*) AS spans FROM opentelemetry_traces WHERE timestamp >= $__from AND timestamp < $__to GROUP BY 1, 2 ORDER BY 1"}},
+      {"id": "scatter", "type": "scatter", "title": "Span duration over time", "w": 6, "h": 4, "options": {"unit": "ms", "decimals": 0},
+       "query": {"kind": "sql", "text": "SELECT CAST(timestamp AS BIGINT) / 1000000 AS t, (CAST(timestamp_end AS BIGINT) - CAST(timestamp AS BIGINT)) / 1000000.0 AS duration FROM opentelemetry_traces WHERE timestamp >= $__from AND timestamp < $__to AND span_kind = 'SPAN_KIND_SERVER' LIMIT 400"}},
+      {"id": "flows", "type": "sankey", "title": "Calls between services", "w": 6, "h": 4,
+       "query": {"kind": "sql", "text": "SELECT p.service_name AS caller, c.service_name AS callee, count(*) AS calls FROM opentelemetry_traces c JOIN opentelemetry_traces p ON c.trace_id = p.trace_id AND c.parent_span_id = p.span_id WHERE c.timestamp >= $__from AND c.timestamp < $__to AND p.timestamp >= $__from AND p.timestamp < $__to AND p.service_name <> c.service_name GROUP BY 1, 2"}},
+      {"id": "stack", "type": "stacked_bar_v", "title": "Spans per service", "w": 6, "h": 3,
+       "query": {"kind": "sql", "text": "SELECT service_name, count(*) AS ok, sum(CASE WHEN span_status_code = 'STATUS_CODE_ERROR' THEN 1 ELSE 0 END) AS errors FROM opentelemetry_traces WHERE timestamp >= $__from AND timestamp < $__to GROUP BY 1 ORDER BY 1"}},
+      {"id": "regions", "type": "geo_map", "title": "Regions (sample points)", "w": 6, "h": 3,
+       "query": {"kind": "sql", "text": "SELECT 1.35 AS lat, 103.82 AS lon, 120 AS users, 'Singapore' AS city UNION ALL SELECT 51.5, -0.12, 80, 'London' UNION ALL SELECT 37.77, -122.42, 150, 'San Francisco' UNION ALL SELECT -33.87, 151.21, 40, 'Sydney'"}}
+    ]},
+    {"id": "more", "title": "More charts", "panels": [
+      {"id": "area", "type": "area", "title": "Spans per minute", "w": 6, "h": 3,
+       "query": {"kind": "sql", "text": "SELECT CAST(date_bin('1 minute'::INTERVAL, timestamp) AS BIGINT) / 1000000 AS minute, count(*) AS spans FROM opentelemetry_traces WHERE timestamp >= $__from AND timestamp < $__to GROUP BY 1 ORDER BY 1"}},
+      {"id": "bars-v", "type": "bar_v", "title": "Spans per service", "w": 6, "h": 3,
+       "query": {"kind": "sql", "text": "SELECT service_name, count(*) AS spans FROM opentelemetry_traces WHERE timestamp >= $__from AND timestamp < $__to GROUP BY 1 ORDER BY 1"}},
+      {"id": "stack-h", "type": "stacked_bar_h", "title": "OK and failed spans", "w": 12, "h": 3,
+       "query": {"kind": "sql", "text": "SELECT service_name, sum(CASE WHEN span_status_code = 'STATUS_CODE_ERROR' THEN 0 ELSE 1 END) AS ok, sum(CASE WHEN span_status_code = 'STATUS_CODE_ERROR' THEN 1 ELSE 0 END) AS failed FROM opentelemetry_traces WHERE timestamp >= $__from AND timestamp < $__to GROUP BY 1 ORDER BY 1"}}
+    ]},
+    {"id": "notes", "title": "Notes", "panels": [
+      {"id": "readme", "type": "markdown", "title": "About this dashboard", "w": 6, "h": 3,
+       "content": "# Demo dashboard\n\nEvery panel runs a saved query; the **Service** variable above is bound as a parameter.\n\n- Switch tabs, change the service selection, set a refresh interval, compare with the past.\n- *Edit* shows the panel queries; *Share* makes a read-only public link.\n\nSee [the docs](https://github.com/teochenglim/grepui)."},
+      {"id": "status", "type": "html", "title": "Status board", "w": 6, "h": 3,
+       "content": "<h3>Runbook</h3><table><tr><th>Service</th><th>Owner</th></tr><tr><td>payment</td><td>payments team</td></tr><tr><td>checkout</td><td>shop team</td></tr></table><p><a href=\"https://example.com/runbook\">Open runbook</a></p><script>alert('removed')</script>"}
+    ]}
+  ]
+}

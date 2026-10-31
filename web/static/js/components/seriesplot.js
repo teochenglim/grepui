@@ -23,6 +23,7 @@ export function fmtVal(v) {
   if (a >= 1e9) return `${(v / 1e9).toFixed(2)}G`;
   if (a >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
   if (a >= 1e4) return `${(v / 1e3).toFixed(1)}k`;
+  if (Number.isInteger(v)) return String(v);
   if (a >= 100) return v.toFixed(0);
   if (a >= 1) return v.toFixed(2);
   return a === 0 ? '0' : v.toPrecision(2);

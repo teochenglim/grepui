@@ -12,7 +12,7 @@ Diagram source: [architecture.mmd](architecture.mmd).
 
 - **API layer (`api/`).** Typed REST endpoints, org-scoped. Parses and validates parameters, checks permission (from v0.11), builds a `Q` (statement tag + SQL with `?` + binds), runs it through the `Reader`, and wraps rows with `meta` (statement tag, ms, rows, source).
 - **Query layer (`query/`).** Pure builders per feature. Table names are validated config identifiers; values are binds. `SqlxReader` applies timeouts and row caps. A planner chooses raw vs rollup (v0.7).
-- **State layer (`store/`).** `grepui_*` tables in a dedicated GreptimeDB database (ADR 0006): schema version, saved views, history now; dashboards, alerts, users and audit later. Every tenant table has `org_id`. `grepui migrate` owns the schema; `AppState::write` is the only write path and `store::check_write` its gate.
+- **State layer (`store/`).** `grepui_*` tables in a dedicated GreptimeDB database (ADR 0006): schema version, saved views, history, service notes and dashboards (folders, dashboards, playlists, public links) now; alerts, users and audit later. Every tenant table has `org_id`. `grepui migrate` owns the schema; `AppState::write` is the only write path and `store::check_write` its gate.
 - **Schedulers (`jobs/`).** Alerts, reports and housekeeping run in every replica; a leader lease row makes each rule fire once.
 - **UI (`ui/`).** Static HTML, CSS and ES modules embedded with `include_bytes!`; org switcher, time range, "Show SQL".
 - **Playground (`playground/`).** Demo-only: deterministic synthetic traces and logs, an OTLP protobuf encoder and a tiny HTTP client. Reachable only from `grepui playground --demo-data`, fenced to `demo`/`demo_*` databases (ADR 0005).

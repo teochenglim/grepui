@@ -2,10 +2,10 @@
 
 Status per release is in `RELEASE.md` (roll-up) and `RELEASE/` (detail). This file is the order and the reasons. Parity targets and gaps: `ARCH/07_parity_matrix.md`. The LLM track has its own design note: `ARCH/08_llm_observability.md`.
 
-## Release train (planned releases 0.8 to 1.0)
+## Release train (planned releases 0.9 to 1.0)
 
-1. **0.1 to 0.7 are built** (foundation, logs, state and data health, traces, services and service map, metrics, rollups and retention); see `RELEASE.md`.
-2. **LLM track** (L1 onward) and **0.8 Dashboards**: next.
+1. **0.1 to 0.8 are built** (foundation, logs, state and data health, traces, services and service map, metrics, rollups and retention, dashboards); see `RELEASE.md`.
+2. **LLM track** (L1 onward) and **0.9 Alerts**: next.
 3. **0.7 Rollups and extended retention** (D5): long windows and TTL tiers.
 4. **0.8 Dashboards, 0.9 Alerts and incidents, 0.10 Pipelines/functions/enrichment/redaction**: the parity modules.
 5. **0.11 Access control, multi-tenancy, SSO, audit; 0.12 Query management, work groups, federation; 0.13 Reports, RUM view, operate**: the enterprise tier.

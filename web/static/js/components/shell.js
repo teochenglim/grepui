@@ -11,6 +11,7 @@ import { timeRange } from './timerange.js';
 const LIVE = [
   ['logs', 'Logs'],
   ['traces', 'Traces'],
+  ['dashboards', 'Dashboards'],
   ['metrics', 'Metrics'],
   ['services', 'Services'],
   ['service-map', 'Service map'],
@@ -22,7 +23,7 @@ const LIVE = [
   ['connect', 'Connect'],
 ];
 const SOON = [
-  ['Dashboards', 'v0.8'], ['Alerts', 'v0.9'],
+  ['Alerts', 'v0.9'],
 ];
 
 export function buildShell(root) {

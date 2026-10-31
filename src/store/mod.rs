@@ -13,7 +13,7 @@ use crate::{
 use anyhow::{Result, bail};
 
 /// Bumped when a migration changes the schema; the binary refuses to run against a newer one.
-pub const SCHEMA_VERSION: i64 = 2;
+pub const SCHEMA_VERSION: i64 = 3;
 /// The one row in `grepui_schema` (`component = 'core'`) holding the version.
 pub const COMPONENT: &str = "core";
 /// How long history entries are kept (also the table TTL).
@@ -44,11 +44,30 @@ pub fn migration_statements(meta_db: &str) -> Result<Vec<String>> {
         format!(
             "CREATE TABLE IF NOT EXISTS `{db}`.`grepui_services` (`org_id` STRING, `service` STRING, `description` STRING, `owner` STRING, `tier` STRING, `runbook` STRING, `updated_by` STRING, `updated_ms` BIGINT, `deleted` BOOLEAN, `ts` TIMESTAMP(3) NOT NULL, TIME INDEX (`ts`), PRIMARY KEY (`org_id`, `service`))"
         ),
+        // Dashboards (v0.8.0). Folders and dashboards are upserted by (org_id, id) at ts = creation
+        // time; delete is soft. `kind` is dashboard or playlist; `spec` is the canonical JSON.
+        format!(
+            "CREATE TABLE IF NOT EXISTS `{db}`.`grepui_folders` (`org_id` STRING, `folder_id` STRING, `name` STRING, `owner` STRING, `created_ms` BIGINT, `updated_ms` BIGINT, `deleted` BOOLEAN, `ts` TIMESTAMP(3) NOT NULL, TIME INDEX (`ts`), PRIMARY KEY (`org_id`, `folder_id`))"
+        ),
+        format!(
+            "CREATE TABLE IF NOT EXISTS `{db}`.`grepui_dashboards` (`org_id` STRING, `dash_id` STRING, `folder_id` STRING, `title` STRING, `kind` STRING, `spec` STRING, `owner` STRING, `created_ms` BIGINT, `updated_ms` BIGINT, `deleted` BOOLEAN, `ts` TIMESTAMP(3) NOT NULL, TIME INDEX (`ts`), PRIMARY KEY (`org_id`, `dash_id`))"
+        ),
+        // Public links: only a hash of the token is stored.
+        format!(
+            "CREATE TABLE IF NOT EXISTS `{db}`.`grepui_shares` (`org_id` STRING, `share_id` STRING, `dash_id` STRING, `token_hash` STRING, `created_by` STRING, `created_ms` BIGINT, `expires_ms` BIGINT, `revoked` BOOLEAN, `ts` TIMESTAMP(3) NOT NULL, TIME INDEX (`ts`), PRIMARY KEY (`org_id`, `share_id`))"
+        ),
     ])
 }
 
 /// Tables that hold tenant data and therefore must carry `org_id` (R-S5).
-pub const TENANT_TABLES: &[&str] = &["grepui_views", "grepui_history", "grepui_services"];
+pub const TENANT_TABLES: &[&str] = &[
+    "grepui_views",
+    "grepui_history",
+    "grepui_services",
+    "grepui_folders",
+    "grepui_dashboards",
+    "grepui_shares",
+];
 
 /// Allow only statements the store itself builds: `INSERT INTO <meta_db>.<allowlisted table> ...`.
 pub fn check_write(q: &Q, meta_db: &str) -> Result<()> {

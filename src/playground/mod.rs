@@ -144,6 +144,38 @@ pub async fn send_metrics(http: &str, db: &str, points: &[synth::MetricPoint]) -
     Ok(())
 }
 
+/// The dashboard the playground adds to an empty state store (it is plain JSON, validated like
+/// any import, and a test keeps it valid).
+pub const DEMO_DASHBOARD: &str = include_str!("demo_dashboard.json");
+
+/// Create the demo dashboard if the org has none. State-store writes only, never telemetry.
+pub async fn seed_demo_dashboard(reader: &SqlxReader, meta_db: &str, org: &str) -> Result<()> {
+    use crate::store::{build, check_write};
+    let (rows, _) = crate::query::run(reader, build::dash_list(meta_db, org, None, None)?).await?;
+    if !rows.is_empty() {
+        return Ok(());
+    }
+    let spec = crate::dash::canonical(&serde_json::from_str(DEMO_DASHBOARD)?)
+        .map_err(|e| anyhow::anyhow!("demo dashboard: {}", e.1))?;
+    let now = (now_ns() / 1_000_000) as i64;
+    let row = build::DashRow {
+        dash_id: format!("{:016x}", rand::random::<u64>()),
+        title: "Demo overview".into(),
+        kind: "dashboard".into(),
+        spec: spec.to_string(),
+        owner: crate::store::LOCAL_USER.into(),
+        created_ms: now,
+        updated_ms: now,
+        ..Default::default()
+    };
+    let q = build::dash_put(meta_db, org, &row)?;
+    check_write(&q, meta_db)?;
+    crate::query::Writer::exec(reader, &q)
+        .await
+        .map_err(|e| anyhow::anyhow!("could not create the demo dashboard: {}", e.detail()))?;
+    Ok(())
+}
+
 /// Everything before serving: wait, guard, seed, start the live trickle.
 pub async fn prepare(cfg: &Config, o: &Opts) -> Result<()> {
     cfg.validate()?;
@@ -157,6 +189,11 @@ pub async fn prepare(cfg: &Config, o: &Opts) -> Result<()> {
     crate::store::migrate(reader.as_ref(), reader.as_ref(), &cfg.meta_database).await?;
     if !o.demo_data {
         return Ok(());
+    }
+    if let Err(e) =
+        seed_demo_dashboard(reader.as_ref(), &cfg.meta_database, crate::org::DEFAULT_ORG).await
+    {
+        tracing::warn!(error = %e, "playground: no demo dashboard");
     }
     let db = cfg.database()?;
     let present = has_traces(reader.as_ref(), &db, &cfg.traces_table).await;

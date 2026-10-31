@@ -31,6 +31,9 @@ pub const WRITE_TARGETS: &[&str] = &[
     "grepui_views",
     "grepui_history",
     "grepui_services",
+    "grepui_folders",
+    "grepui_dashboards",
+    "grepui_shares",
 ];
 
 #[derive(Debug, Clone, PartialEq)]

@@ -1,6 +1,7 @@
 //! The typed REST API (`/api/v1`). Every data route is org-scoped (R-F5).
 
 pub mod connect;
+pub mod dashboards;
 pub mod health;
 pub mod ingest;
 pub mod logs;
@@ -246,6 +247,24 @@ pub const ROUTES: &[&str] = &[
     "/api/v1/orgs/{org}/services/{service}/annotation",
     "/api/v1/orgs/{org}/dependencies",
     "/api/v1/orgs/{org}/catalog",
+    "/api/v1/orgs/{org}/folders",
+    "/api/v1/orgs/{org}/folders/{id}",
+    "/api/v1/orgs/{org}/dashboards",
+    "/api/v1/orgs/{org}/dashboards/export",
+    "/api/v1/orgs/{org}/dashboards/import",
+    "/api/v1/orgs/{org}/dashboards/move",
+    "/api/v1/orgs/{org}/dashboards/{id}",
+    "/api/v1/orgs/{org}/dashboards/{id}/export",
+    "/api/v1/orgs/{org}/dashboards/{id}/variables",
+    "/api/v1/orgs/{org}/dashboards/{id}/panels/{panel}/data",
+    "/api/v1/orgs/{org}/dashboards/{id}/shares",
+    "/api/v1/orgs/{org}/dashboards/{id}/shares/{share}",
+    "/api/v1/orgs/{org}/public/{token}",
+    "/api/v1/orgs/{org}/public/{token}/variables",
+    "/api/v1/orgs/{org}/public/{token}/panels/{panel}/data",
+    "/api/v1/orgs/{org}/playlists",
+    "/api/v1/orgs/{org}/playlists/{id}",
+    "/api/v1/orgs/{org}/playlists/{id}/now",
     "/api/v1/orgs/{org}/rollups",
     "/api/v1/orgs/{org}/rollups/{template}",
     "/api/v1/orgs/{org}/rollups/{template}/backfill",
@@ -272,6 +291,22 @@ pub const WRITE_ROUTES: &[(&str, &str)] = &[
     ("PUT", "/api/v1/orgs/{org}/views/{id}"),
     ("DELETE", "/api/v1/orgs/{org}/views/{id}"),
     ("POST", "/api/v1/orgs/{org}/history"),
+    ("POST", "/api/v1/orgs/{org}/folders"),
+    ("PUT", "/api/v1/orgs/{org}/folders/{id}"),
+    ("DELETE", "/api/v1/orgs/{org}/folders/{id}"),
+    ("POST", "/api/v1/orgs/{org}/dashboards"),
+    ("POST", "/api/v1/orgs/{org}/dashboards/import"),
+    ("POST", "/api/v1/orgs/{org}/dashboards/move"),
+    ("PUT", "/api/v1/orgs/{org}/dashboards/{id}"),
+    ("DELETE", "/api/v1/orgs/{org}/dashboards/{id}"),
+    ("POST", "/api/v1/orgs/{org}/dashboards/{id}/shares"),
+    (
+        "DELETE",
+        "/api/v1/orgs/{org}/dashboards/{id}/shares/{share}",
+    ),
+    ("POST", "/api/v1/orgs/{org}/playlists"),
+    ("PUT", "/api/v1/orgs/{org}/playlists/{id}"),
+    ("DELETE", "/api/v1/orgs/{org}/playlists/{id}"),
     ("POST", "/api/v1/orgs/{org}/rollups/{template}"),
     ("POST", "/api/v1/orgs/{org}/rollups/{template}/backfill"),
     ("DELETE", "/api/v1/orgs/{org}/rollups/{template}"),
@@ -334,6 +369,82 @@ pub fn router(state: Shared) -> Router {
             get(services::dependencies),
         )
         .route("/api/v1/orgs/{org}/catalog", get(services::catalog))
+        .route(
+            "/api/v1/orgs/{org}/folders",
+            get(dashboards::folder_list).post(dashboards::folder_create),
+        )
+        .route(
+            "/api/v1/orgs/{org}/folders/{id}",
+            axum::routing::put(dashboards::folder_rename).delete(dashboards::folder_delete),
+        )
+        .route(
+            "/api/v1/orgs/{org}/dashboards",
+            get(dashboards::dash_list).post(dashboards::dash_create),
+        )
+        .route(
+            "/api/v1/orgs/{org}/dashboards/export",
+            get(dashboards::export_all),
+        )
+        .route(
+            "/api/v1/orgs/{org}/dashboards/import",
+            axum::routing::post(dashboards::import),
+        )
+        .route(
+            "/api/v1/orgs/{org}/dashboards/move",
+            axum::routing::post(dashboards::move_many),
+        )
+        .route(
+            "/api/v1/orgs/{org}/dashboards/{id}",
+            get(dashboards::dash_get)
+                .put(dashboards::dash_update)
+                .delete(dashboards::dash_delete),
+        )
+        .route(
+            "/api/v1/orgs/{org}/dashboards/{id}/export",
+            get(dashboards::export_one),
+        )
+        .route(
+            "/api/v1/orgs/{org}/dashboards/{id}/variables",
+            get(dashboards::variables),
+        )
+        .route(
+            "/api/v1/orgs/{org}/dashboards/{id}/panels/{panel}/data",
+            get(dashboards::data),
+        )
+        .route(
+            "/api/v1/orgs/{org}/dashboards/{id}/shares",
+            get(dashboards::share_list).post(dashboards::share_create),
+        )
+        .route(
+            "/api/v1/orgs/{org}/dashboards/{id}/shares/{share}",
+            axum::routing::delete(dashboards::share_revoke),
+        )
+        .route(
+            "/api/v1/orgs/{org}/public/{token}",
+            get(dashboards::public_get),
+        )
+        .route(
+            "/api/v1/orgs/{org}/public/{token}/variables",
+            get(dashboards::public_variables),
+        )
+        .route(
+            "/api/v1/orgs/{org}/public/{token}/panels/{panel}/data",
+            get(dashboards::public_data),
+        )
+        .route(
+            "/api/v1/orgs/{org}/playlists",
+            get(dashboards::playlist_list).post(dashboards::playlist_create),
+        )
+        .route(
+            "/api/v1/orgs/{org}/playlists/{id}",
+            get(dashboards::playlist_get)
+                .put(dashboards::playlist_update)
+                .delete(dashboards::playlist_delete),
+        )
+        .route(
+            "/api/v1/orgs/{org}/playlists/{id}/now",
+            get(dashboards::playlist_now),
+        )
         .route("/api/v1/orgs/{org}/rollups", get(storage::rollups))
         .route(
             "/api/v1/orgs/{org}/rollups/{template}",

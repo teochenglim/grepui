@@ -319,6 +319,13 @@ pub struct MemStore {
     pub views: Mutex<HashMap<(String, String), Vec<Bind>>>,
     pub history: Mutex<Vec<Vec<Bind>>>,
     pub notes: Mutex<HashMap<(String, String), Vec<Bind>>>,
+    pub folders: Mutex<HashMap<(String, String), Vec<Bind>>>,
+    pub dashes: Mutex<HashMap<(String, String), Vec<Bind>>>,
+    pub shares: Mutex<HashMap<(String, String), Vec<Bind>>>,
+    /// Every query the reader saw (panel data included).
+    pub seen: Mutex<Vec<Q>>,
+    /// Answers for queries that are not state-store reads; `sample_db` when unset.
+    pub script: Mutex<Option<Script>>,
     pub version: Mutex<Option<i64>>,
     pub ddl: Mutex<Vec<String>>,
     pub writes: Mutex<Vec<Q>>,
@@ -352,6 +359,7 @@ impl MemStore {
 #[async_trait]
 impl Reader for MemStore {
     async fn fetch(&self, q: &Q) -> Result<Vec<Value>, ReadError> {
+        self.seen.lock().unwrap().push(q.clone());
         if *self.fail_missing.lock().unwrap() && q.sql.contains("grepui_") {
             return Err(ReadError::Db(
                 "Table not found: greptime.grepui.grepui_views".into(),
@@ -392,6 +400,67 @@ impl Reader for MemStore {
                 rows.sort_by_key(|(u, _)| std::cmp::Reverse(*u));
                 rows.into_iter().map(|(_, v)| v).collect()
             }
+            "folder_list" => {
+                let org = s_of(&q.binds[0]);
+                let mut rows: Vec<(String, Value)> = self.folders.lock().unwrap().iter().filter(|((o, _), b)| *o == org && b[6] == Bind::Bool(false)).map(|((_, id), b)| (s_of(&b[2]), json!({"folder_id": id, "name": s_of(&b[2]), "owner": s_of(&b[3]), "created_ms": i_of(&b[4]), "updated_ms": i_of(&b[5])}))).collect();
+                rows.sort_by(|a, b| a.0.cmp(&b.0));
+                rows.into_iter().map(|(_, v)| v).collect()
+            }
+            "dash_list" | "dash_export_list" | "dash_get" => {
+                let org = s_of(&q.binds[0]);
+                let by_id = q.name == "dash_get";
+                let mut rest = q.binds[1..].iter().map(s_of);
+                let id = by_id.then(|| rest.next()).flatten();
+                let folder = q
+                    .sql
+                    .contains("`folder_id` = ?")
+                    .then(|| rest.next())
+                    .flatten();
+                let kind = q.sql.contains("`kind` = ?").then(|| rest.next()).flatten();
+                let mut rows: Vec<(String, Value)> = self
+                    .dashes
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|((o, d), b)| {
+                        *o == org
+                            && b[9] == Bind::Bool(false)
+                            && id.as_ref().is_none_or(|i| i == d)
+                            && folder.as_ref().is_none_or(|f| *f == s_of(&b[2]))
+                            && kind.as_ref().is_none_or(|k| *k == s_of(&b[4]))
+                            && (q.name != "dash_export_list" || s_of(&b[4]) == "dashboard")
+                    })
+                    .map(|((_, d), b)| {
+                        let mut v = json!({"dash_id": d, "folder_id": s_of(&b[2]), "title": s_of(&b[3]), "kind": s_of(&b[4]), "owner": s_of(&b[6]), "created_ms": i_of(&b[7]), "updated_ms": i_of(&b[8])});
+                        if q.name != "dash_list" {
+                            v["spec"] = json!(s_of(&b[5]));
+                        }
+                        (s_of(&b[3]), v)
+                    })
+                    .collect();
+                rows.sort_by(|a, b| a.0.cmp(&b.0));
+                rows.into_iter().map(|(_, v)| v).collect()
+            }
+            "share_list" | "share_get" | "share_by_hash" => {
+                let (org, arg) = (s_of(&q.binds[0]), s_of(&q.binds[1]));
+                let mut rows: Vec<(i64, Value)> = self
+                    .shares
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|((o, sid), b)| {
+                        *o == org
+                            && match q.name {
+                                "share_list" => s_of(&b[2]) == arg,
+                                "share_get" => *sid == arg,
+                                _ => s_of(&b[3]) == arg,
+                            }
+                    })
+                    .map(|((_, sid), b)| (i_of(&b[5]), json!({"share_id": sid, "dash_id": s_of(&b[2]), "token_hash": s_of(&b[3]), "created_by": s_of(&b[4]), "created_ms": i_of(&b[5]), "expires_ms": i_of(&b[6]), "revoked": b[7] == Bind::Bool(true)})))
+                    .collect();
+                rows.sort_by_key(|(t, _)| std::cmp::Reverse(*t));
+                rows.into_iter().map(|(_, v)| v).collect()
+            }
             "service_notes" | "service_note_get" => {
                 let org = s_of(&q.binds[0]);
                 let only = q.binds.get(1).map(s_of);
@@ -423,7 +492,10 @@ impl Reader for MemStore {
                 rows.sort_by_key(|(t, _)| std::cmp::Reverse(*t));
                 rows.into_iter().take(limit).map(|(_, v)| v).collect()
             }
-            _ => sample_db(q)?,
+            _ => match self.script.lock().unwrap().as_ref() {
+                Some(f) => f(q)?,
+                None => sample_db(q)?,
+            },
         })
     }
 }
@@ -447,6 +519,24 @@ impl Writer for MemStore {
             }
             "history_add" => self.history.lock().unwrap().push(q.binds.clone()),
             "rollup_backfill" => return Ok(5),
+            "folder_put" => {
+                self.folders
+                    .lock()
+                    .unwrap()
+                    .insert((s_of(&q.binds[0]), s_of(&q.binds[1])), q.binds.clone());
+            }
+            "dash_put" => {
+                self.dashes
+                    .lock()
+                    .unwrap()
+                    .insert((s_of(&q.binds[0]), s_of(&q.binds[1])), q.binds.clone());
+            }
+            "share_put" => {
+                self.shares
+                    .lock()
+                    .unwrap()
+                    .insert((s_of(&q.binds[0]), s_of(&q.binds[1])), q.binds.clone());
+            }
             "schema_put" => *self.version.lock().unwrap() = Some(i_of(&q.binds[1])),
             other => return Err(ReadError::Db(format!("unexpected write {other}"))),
         }
@@ -497,6 +587,28 @@ pub async fn send_json(app: &Router, method: Method, uri: &str, body: &Value) ->
                 .method(method)
                 .uri(uri)
                 .header("content-type", "application/json")
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let (parts, body) = r.into_parts();
+    Resp {
+        status: parts.status,
+        headers: parts.headers,
+        body: body.collect().await.unwrap().to_bytes().to_vec(),
+    }
+}
+
+/// A request with a raw text body (for malformed-JSON cases).
+pub async fn send_text(app: &Router, method: Method, uri: &str, body: &str) -> Resp {
+    let r = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(method)
+                .uri(uri)
+                .header("content-type", "text/plain")
                 .body(Body::from(body.to_string()))
                 .unwrap(),
         )

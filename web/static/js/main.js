@@ -2,6 +2,8 @@
 
 import * as api from './api.js';
 import { buildShell } from './components/shell.js';
+import { dashboardPage } from './pages/dashboard.js';
+import { dashboardsPage } from './pages/dashboards.js';
 import { catalogPage } from './pages/catalog.js';
 import { connectPage } from './pages/connect.js';
 import { healthPage } from './pages/health.js';
@@ -13,6 +15,8 @@ import { tracesPage } from './pages/traces.js';
 import { serviceDetailPage } from './pages/service-detail.js';
 import { serviceMapPage } from './pages/service-map.js';
 import { servicesPage } from './pages/services.js';
+import { playlistPage } from './pages/playlist.js';
+import { publicPage } from './pages/public.js';
 import { retentionPage } from './pages/retention.js';
 import { rollupsPage } from './pages/rollups.js';
 import { streamDetailPage } from './pages/stream-detail.js';
@@ -24,6 +28,10 @@ const shell = buildShell(document.getElementById('app'));
 route('logs', logsPage);
 route('traces', tracesPage);
 route('traces/:id', traceDetailPage);
+route('dashboards', dashboardsPage);
+route('dashboards/:id', dashboardPage);
+route('playlists/:id', playlistPage);
+route('public/:token', publicPage);
 route('metrics', metricsPage);
 route('services', servicesPage);
 route('services/:name', serviceDetailPage);
@@ -39,6 +47,7 @@ route('*', notFound);
 
 start(shell.view, {
   beforeRender: (parts) => {
+    document.body.classList.remove('tv');
     api.resetQueries();
     shell.paintNav(parts);
   },
