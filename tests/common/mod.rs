@@ -137,6 +137,15 @@ pub fn sample_db(q: &Q) -> Result<Vec<Value>, ReadError> {
             json!({"caller": "frontend", "callee": "checkout", "calls": 240, "errors": 0, "avg_us": 26_000.0}),
             json!({"caller": "checkout", "callee": "payment", "calls": 197, "errors": 32, "avg_us": 18_000.0}),
         ],
+        "metrics_names" => vec![
+            json!({"table_name": "http_server_request_count_total", "create_options": "greptime.semantic.metric.type=counter on_physical_table=greptime_physical_table"}),
+            json!({"table_name": "process_cpu_utilization", "create_options": "greptime.semantic.metric.type=gauge"}),
+        ],
+        "metrics_query" => vec![
+            json!({"greptime_timestamp": 1_793_399_100_000i64, "greptime_value": 1.5, "service_name": "cart"}),
+            json!({"greptime_timestamp": 1_793_399_160_000i64, "greptime_value": 2.5, "service_name": "cart"}),
+            json!({"greptime_timestamp": 1_793_399_100_000i64, "greptime_value": 9.0, "service_name": "payment"}),
+        ],
         "trace_spans" => sample_trace(),
         "trace_logs" => vec![log_row("1793399384857990822", "ERROR", "Charge failed")],
         "stream_sample" => {

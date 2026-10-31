@@ -132,3 +132,11 @@ button.icon { padding: 1px 6px; border: 0; font-size: 13px; }
 .noteform { display: flex; flex-direction: column; gap: 8px; } .noteform label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); font-size: 12px; } .noteform textarea { font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
 .note p { margin: 0 0 6px; } .badge.tier-critical { color: var(--bad); } .badge.tier-high { color: var(--warn); }
 .stack { display: flex; flex-direction: column; gap: var(--gap); }
+
+/* Metrics */
+.metric-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.metric { display: flex; justify-content: space-between; gap: 8px; align-items: center; text-align: left; font-size: 12.5px; padding: 4px 8px; } .metric.sel { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 12px; } .lg { display: inline-flex; align-items: center; }
+.line.series { height: 240px; } .line.series .path { stroke-width: 1.6; }
+.bars { display: flex; flex-direction: column; gap: 6px; } .barrow { display: grid; grid-template-columns: minmax(120px, 30%) 1fr 70px; gap: 8px; align-items: center; font-size: 12.5px; }
+.bartrack { height: 12px; background: var(--surface-2); border-radius: 6px; overflow: hidden; } .barfill { display: block; height: 100%; border-radius: 6px; } .barval { text-align: right; font-variant-numeric: tabular-nums; }

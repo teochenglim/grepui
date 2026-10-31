@@ -2,7 +2,7 @@
 //! only). Field numbers follow opentelemetry-proto: ExportTraceServiceRequest and
 //! ExportLogsServiceRequest.
 
-use super::synth::{AttrVal, Batch, LogRec, SERVICES, SpanRec};
+use super::synth::{AttrVal, Batch, LogRec, MetricPoint, SERVICES, SpanRec};
 
 pub fn varint(mut n: u64) -> Vec<u8> {
     let mut out = Vec::new();
@@ -132,6 +132,63 @@ pub fn encode_logs(b: &Batch) -> Vec<u8> {
                 f_bytes(
                     1,
                     &[resource(svc), f_bytes(2, &[scope(), recs].concat())].concat(),
+                )
+            })
+        })
+        .flatten()
+        .collect()
+}
+
+/// NumberDataPoint { attributes = 7, time_unix_nano = 3, as_double = 4 }
+fn number_point(p: &MetricPoint) -> Vec<u8> {
+    [
+        f_fix64(3, p.ts_ns),
+        f_fix64(4, p.value.to_bits()),
+        p.attrs
+            .iter()
+            .flat_map(|(k, v)| f_bytes(7, &attr(k, v)))
+            .collect::<Vec<u8>>(),
+    ]
+    .concat()
+}
+
+/// Metric { name = 1, gauge = 5 { data_points = 1 }, sum = 7 { data_points = 1,
+/// aggregation_temporality = 2 (cumulative), is_monotonic = 3 } }
+fn metric(name: &str, counter: bool, points: &[&MetricPoint]) -> Vec<u8> {
+    let dps: Vec<u8> = points
+        .iter()
+        .flat_map(|p| f_bytes(1, &number_point(p)))
+        .collect();
+    let body = if counter {
+        f_bytes(7, &[dps, f_var(2, 2), f_var(3, 1)].concat())
+    } else {
+        f_bytes(5, &dps)
+    };
+    [f_str(1, name), body].concat()
+}
+
+/// ExportMetricsServiceRequest: one ResourceMetrics per service, one Metric per metric name.
+pub fn encode_metrics(points: &[MetricPoint]) -> Vec<u8> {
+    SERVICES
+        .iter()
+        .filter_map(|svc| {
+            let mine: Vec<&MetricPoint> = points.iter().filter(|p| p.service == *svc).collect();
+            let mut names: Vec<(&str, bool)> = mine.iter().map(|p| (p.name, p.counter)).collect();
+            names.dedup();
+            names.sort_unstable();
+            names.dedup();
+            let metrics: Vec<u8> = names
+                .iter()
+                .flat_map(|(n, c)| {
+                    let pts: Vec<&MetricPoint> =
+                        mine.iter().copied().filter(|p| p.name == *n).collect();
+                    f_bytes(2, &metric(n, *c, &pts))
+                })
+                .collect();
+            (!metrics.is_empty()).then(|| {
+                f_bytes(
+                    1,
+                    &[resource(svc), f_bytes(2, &[scope(), metrics].concat())].concat(),
                 )
             })
         })

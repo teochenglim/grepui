@@ -2,7 +2,7 @@
 
 The single place to see where grepui stands: what is shipped, what is planned, what each release proves, and how a release is cut. Per-release detail (scope, acceptance criteria, named tests, checklist) lives in [`RELEASE/vX.Y.Z.md`](RELEASE/README.md); this file is the readable roll-up and the changelog.
 
-> **Current state:** v0.1.0 to v0.5.0 are **ready** (code, tests and docs done; v0.1.0 to v0.3.0 are committed, v0.4.0 and v0.5.0 are not; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.6.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
+> **Current state:** v0.1.0 to v0.6.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.7.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
 
 ## 1. Summary
 
@@ -21,7 +21,7 @@ grepui is a multi-tenant observability UI for GreptimeDB: one Rust binary (axum)
 
 ## 2. Release status
 
-Latest built: **v0.5.0: Services and service map** (ready). Newest first.
+Latest built: **v0.6.0: Metrics** (ready). Newest first.
 
 | Release | Theme | Status | ACs | Requirements covered |
 |---|---|---|---|---|
@@ -33,7 +33,7 @@ Latest built: **v0.5.0: Services and service map** (ready). Newest first.
 | [v0.9.0](RELEASE/v0.9.0.md) | Alerts and incidents | planned | 8 | R-A1 R-A2 R-A3 R-A4 R-A5 R-A6 R-A7 R-A8 |
 | [v0.8.0](RELEASE/v0.8.0.md) | Dashboards | planned | 6 | R-B1 R-B2 R-B3 R-B4 R-B5 R-B6 |
 | [v0.7.0](RELEASE/v0.7.0.md) | Rollups and extended retention | planned | 4 | R-F4 R-P1 R-P2 R-P3 R-X1 |
-| [v0.6.0](RELEASE/v0.6.0.md) | Metrics | planned | 2 | R-M1 R-M2 |
+| [v0.6.0](RELEASE/v0.6.0.md) | Metrics | ready | 2 | R-M1 R-M2 |
 | [v0.5.0](RELEASE/v0.5.0.md) | Services and service map | ready | 4 | R-V1 R-V2 R-V3 R-V4 |
 | [v0.4.0](RELEASE/v0.4.0.md) | Traces and the v0.3.0 CI fix | ready | 6 | R-R1 R-R2 R-R3 R-R4 R-R5 R-R6 |
 | [v0.3.0](RELEASE/v0.3.0.md) | State, saved views, stream health and the SQL-mode fix | ready | 7 | R-F4 R-I2 R-L5 R-Q1 R-S1 R-S2 R-S3 R-S4 R-S5 |
@@ -60,6 +60,12 @@ Newest first. An entry is written when a release becomes `ready`; the same text 
 ### Unreleased
 
 - Requirements, architecture, positioning and parity matrix (ARCH 00–07), release plan with ACs for v0.1.0–v1.0.0, `scripts/seed.py` (demo traces and logs over OTLP/protobuf, `--db` per org).
+
+### v0.6.0: Metrics (ready)
+
+Added: PromQL range and instant queries through `TQL EVAL` with a step floor and window and sample caps; a Metrics page (metric list with counter/gauge kind, label names, PromQL or SQL, line, bar or table chart, Copy link); a shareable page spec in the URL (chart, kind, stream, query, range) that saved views can store (kind `metrics`); SQL on metric tables through SQL mode; demo metrics in the playground.
+
+PromQL text is embedded in the TQL statement (no bind parameters exist for it), so it is checked first, and matchers named `__schema__` or `__database__` are refused in every spelling because they select another database (verified live). TQL is still refused in SQL mode. Verified live on a fresh v1.3.0: exact counter and gauge values, `rate` within 5%, SQL on the metric table, names and labels; and in a browser. Not exercised in a browser: bar and table charts, Copy link, sample-limit truncation.
 
 ### v0.5.0: Services and service map (ready)
 
@@ -139,12 +145,6 @@ Will add: Planner choosing raw or rollup with `meta.source`; Rollup management f
 
 `docs/rollup.sql` Flow DDL verified here. First release with GreptimeDB DDL writes.
 
-### v0.6.0: Metrics (planned)
-
-Will add: PromQL range and instant queries; Metric and label lists, SQL on metric tables; Shareable URL encoding chart type and query.
-
-To verify live: `TQL EVAL` output columns and label handling over the MySQL protocol.
-
 ## 5. Verified and unverified
 
 Honest ledger of what has actually been run. Updated as releases land.
@@ -163,6 +163,7 @@ Honest ledger of what has actually been run. Updated as releases land.
 | OpenInference spans on trace v2 (JSON2) | spike on v1.3.0: stored with 19 fixed columns (300 indexed messages and a 200 KB prompt in one span), queried with `json_get_*(col, '["key"]')`; grepui's trace list/waterfall/logs work on a v2 table, its span panel and attribute filters do not yet (roadmap LLM track L1) |
 | CI-parity run (fresh `make db-down db-up`, seed, `make test-db`) | green for every live test after the v0.4.0 fixes; it reproduced the v0.3.0 CI failure and found the join bug below |
 | **GreptimeDB v1.2.1: `IN (subquery)`, `EXISTS` and self-joins on a telemetry table return wrong, nondeterministic rows** | verified live (4 / 6 / 5 / 0 for a true 33); no such query is used (ADR 0007); the v0.5.0 dependency self-join is verified correct on v1.3.0 (`ac_0_5_3_dependencies_live`) |
+| PromQL through TQL EVAL, metric and label lists, SQL on metric tables (v0.6.0) | verified live against generated metrics (exact counter and gauge values, rate within 5%) and in a browser; `TQL EVAL` works over the MySQL prepared-statement protocol |
 | Services RED, series, operations, dependencies and catalog notes (v0.5.0) | verified live against generated traces (counts, errors, average, p95 within 10%, every dependency edge) and in a browser |
 | Trace list, histogram, scatter, waterfall, flame graph, span panel, logs pivot (v0.4.0) | verified live against generated traces with exact numbers (`ac_0_4_*_live`) and in a browser (list, trace page, flame graph, logs tab, span panel) |
 | State store on GreptimeDB (v0.3.0): upsert by key + time index, soft delete, org isolation, `TIMESTAMP(3)` casts to ms, reserved word `name`, migration idempotent, views read back from a second app instance | verified live (`ac_0_3_*_live`) and in a browser (save, share link, recent, data health, stream details) |

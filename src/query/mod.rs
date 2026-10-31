@@ -4,6 +4,7 @@
 pub mod build;
 pub mod filter;
 pub mod logs;
+pub mod metrics;
 pub mod reader;
 pub mod services;
 pub mod sqlmode;

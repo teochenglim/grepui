@@ -19,9 +19,11 @@ use serde::Deserialize;
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 
-const KINDS: &[&str] = &["logs", "sql"];
+const KINDS: &[&str] = &["logs", "sql", "metrics"];
 /// What a view or history entry may remember: the search, never raw results or credentials.
-const SPEC_KEYS: &[&str] = &["q", "level", "range", "mode", "sql"];
+const SPEC_KEYS: &[&str] = &[
+    "q", "level", "range", "mode", "sql", "chart", "kind", "stream",
+];
 const MAX_VALUE: usize = 8_000;
 const MAX_NAME: usize = 100;
 
@@ -30,7 +32,7 @@ fn kind(k: &str) -> Result<&str, ApiError> {
         .iter()
         .copied()
         .find(|x| *x == k)
-        .ok_or_else(|| ApiError::bad("kind must be logs or sql"))
+        .ok_or_else(|| ApiError::bad("kind must be logs, sql or metrics"))
 }
 
 fn name(n: &str) -> Result<String, ApiError> {

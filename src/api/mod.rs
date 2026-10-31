@@ -4,6 +4,7 @@ pub mod connect;
 pub mod health;
 pub mod ingest;
 pub mod logs;
+pub mod metrics;
 pub mod services;
 pub mod sql;
 pub mod streams;
@@ -187,6 +188,9 @@ pub const ROUTES: &[&str] = &[
     "/api/v1/orgs/{org}/services/{service}/annotation",
     "/api/v1/orgs/{org}/dependencies",
     "/api/v1/orgs/{org}/catalog",
+    "/api/v1/orgs/{org}/metrics",
+    "/api/v1/orgs/{org}/metrics/query",
+    "/api/v1/orgs/{org}/metrics/{name}/labels",
     "/api/v1/orgs/{org}/logs",
     "/api/v1/orgs/{org}/logs/histogram",
     "/api/v1/orgs/{org}/logs/fields",
@@ -262,6 +266,12 @@ pub fn router(state: Shared) -> Router {
             get(services::dependencies),
         )
         .route("/api/v1/orgs/{org}/catalog", get(services::catalog))
+        .route("/api/v1/orgs/{org}/metrics", get(metrics::names))
+        .route("/api/v1/orgs/{org}/metrics/query", get(metrics::query))
+        .route(
+            "/api/v1/orgs/{org}/metrics/{name}/labels",
+            get(metrics::labels),
+        )
         .route("/api/v1/orgs/{org}/traces", get(traces::list))
         .route(
             "/api/v1/orgs/{org}/traces/histogram",

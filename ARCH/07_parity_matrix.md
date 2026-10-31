@@ -36,8 +36,8 @@ Status: `planned` (requirement ID and release; a row whose release is `ready` or
 | Feature | Evidence | Edition | grepui | Notes |
 |---|---|---|---|---|
 | Prometheus remote write, OTLP, JSON, scraping | read | | n/a, GreptimeDB | Connect page |
-| PromQL and SQL queries | read | | planned R-M1, R-M2, 0.6 | `TQL EVAL` |
-| Share URL encoding chart type, query, stream, range, refresh | read | | planned R-M2, 0.6 | |
+| PromQL and SQL queries | read | | built R-M1, R-M2, 0.6 | `TQL EVAL` |
+| Share URL encoding chart type, query, stream, range, refresh | read | | built R-M2, 0.6 | |
 | Downsampling | nav | | planned R-P3, 0.7 | Flow templates |
 | Retention settings | read | | planned R-X1, 0.7 | |
 | Alerting on metrics | read | | planned R-A1, 0.9 | PromQL query mode |

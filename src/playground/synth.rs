@@ -216,3 +216,90 @@ pub fn generate(seed: u64, traces: usize, now_ns: u64, minutes: u64) -> Batch {
     }
     out
 }
+
+// ---- metrics ----------------------------------------------------------------------------
+
+/// One OTLP data point of a demo metric.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MetricPoint {
+    pub service: &'static str,
+    pub name: &'static str,
+    /// A cumulative monotonic sum (counter) when true, a gauge otherwise.
+    pub counter: bool,
+    pub attrs: Vec<(String, AttrVal)>,
+    pub ts_ns: u64,
+    pub value: f64,
+}
+
+pub const COUNTER: &str = "http_server_request_count";
+pub const GAUGE: &str = "process_cpu_utilization";
+/// Seconds between demo data points.
+pub const METRIC_STEP_S: u64 = 15;
+const COUNTER_EPOCH_S: f64 = 1_700_000_000.0;
+
+fn base_rate(service: &str) -> f64 {
+    match service {
+        "frontend" => 20.0,
+        "cart" => 12.0,
+        "checkout" => 8.0,
+        "payment" => 6.0,
+        "inventory" => 5.0,
+        _ => 15.0,
+    }
+}
+
+fn error_share(service: &str) -> f64 {
+    if service == "payment" { 0.12 } else { 0.02 }
+}
+
+/// The counter value at `t_s` seconds: the integral of a rate that wobbles around its base,
+/// so it only ever grows and is the same number whenever it is asked for (the live trickle
+/// continues the series the seed started).
+pub fn counter_at(service: &str, error: bool, t_s: u64) -> f64 {
+    let share = error_share(service);
+    let base = base_rate(service) * if error { share } else { 1.0 - share };
+    let t = t_s as f64 - COUNTER_EPOCH_S;
+    let period = 1800.0;
+    let w = std::f64::consts::TAU / period;
+    (base * (t + 0.3 * (1.0 - (w * t).cos()) / w)).floor()
+}
+
+/// CPU utilisation in 0..1 at `t_s`: a slow wave per service plus a small deterministic wobble.
+pub fn gauge_at(service: &str, t_s: u64) -> f64 {
+    let phase = service.bytes().map(f64::from).sum::<f64>();
+    let wobble = (t_s.wrapping_mul(2_654_435_761) % 1000) as f64 / 1000.0 * 0.04;
+    let v = 0.35 + 0.2 * (t_s as f64 / 900.0 + phase).sin() + wobble;
+    (v * 1000.0).round() / 1000.0
+}
+
+/// Data points every [`METRIC_STEP_S`] seconds in `[from_ns, to_ns)`, aligned to the step.
+pub fn generate_metrics(from_ns: u64, to_ns: u64) -> Vec<MetricPoint> {
+    let step = METRIC_STEP_S * 1_000_000_000;
+    let mut out = vec![];
+    let mut t = from_ns.div_ceil(step) * step;
+    while t < to_ns {
+        let t_s = t / 1_000_000_000;
+        for svc in SERVICES {
+            for (class, error) in [("2xx", false), ("5xx", true)] {
+                out.push(MetricPoint {
+                    service: svc,
+                    name: COUNTER,
+                    counter: true,
+                    attrs: vec![("http.status_class".into(), AttrVal::Str(class.into()))],
+                    ts_ns: t,
+                    value: counter_at(svc, error, t_s),
+                });
+            }
+            out.push(MetricPoint {
+                service: svc,
+                name: GAUGE,
+                counter: false,
+                attrs: vec![],
+                ts_ns: t,
+                value: gauge_at(svc, t_s),
+            });
+        }
+        t += step;
+    }
+    out
+}

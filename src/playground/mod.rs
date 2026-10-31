@@ -120,6 +120,30 @@ pub async fn send(
     Ok(())
 }
 
+/// Send demo metric points to GreptimeDB's OTLP metrics endpoint, into `db`.
+pub async fn send_metrics(http: &str, db: &str, points: &[synth::MetricPoint]) -> Result<()> {
+    if points.is_empty() {
+        return Ok(());
+    }
+    let (code, body) = http::post(
+        http,
+        "/v1/otlp/v1/metrics",
+        &[
+            ("content-type", "application/x-protobuf"),
+            ("x-greptime-db-name", db),
+        ],
+        &proto::encode_metrics(points),
+    )
+    .await?;
+    if code != 200 {
+        bail!(
+            "GreptimeDB rejected the demo metrics (HTTP {code}): {}",
+            body.chars().take(200).collect::<String>()
+        );
+    }
+    Ok(())
+}
+
 /// Everything before serving: wait, guard, seed, start the live trickle.
 pub async fn prepare(cfg: &Config, o: &Opts) -> Result<()> {
     cfg.validate()?;
@@ -154,6 +178,9 @@ pub async fn prepare(cfg: &Config, o: &Opts) -> Result<()> {
         let batch = synth::generate(o.seed, o.traces, now_ns(), o.minutes);
         tracing::info!(%db, traces = o.traces, spans = batch.spans.len(), logs = batch.logs.len(), "playground: seeding demo data");
         send(&o.http, &db, &cfg.traces_table, &cfg.logs_table, &batch).await?;
+        let to = now_ns();
+        let from = to.saturating_sub(o.minutes * 60 * 1_000_000_000);
+        send_metrics(&o.http, &db, &synth::generate_metrics(from, to)).await?;
     }
     if o.live {
         let (http, db, tt, lt, seed) = (
@@ -171,6 +198,11 @@ pub async fn prepare(cfg: &Config, o: &Opts) -> Result<()> {
                 let b = synth::generate(seed.wrapping_add(n), 2, now_ns(), 1);
                 if let Err(e) = send(&http, &db, &tt, &lt, &b).await {
                     tracing::warn!(error = %e, "playground: live demo traffic failed");
+                }
+                let to = now_ns();
+                let pts = synth::generate_metrics(to.saturating_sub(5_000_000_000), to);
+                if let Err(e) = send_metrics(&http, &db, &pts).await {
+                    tracing::warn!(error = %e, "playground: live demo metrics failed");
                 }
             }
         });

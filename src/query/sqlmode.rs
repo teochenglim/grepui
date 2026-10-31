@@ -62,13 +62,14 @@ pub fn check(sql: &str, database: &str) -> Result<(), Reject> {
     }
     // GreptimeDB's TQL (PromQL over SQL) can select another database with the `__schema__` /
     // `__database__` matchers, which no SQL-level check here can see. Until PromQL runs through a
-    // typed endpoint that rejects those matchers (v0.6.0), TQL is not available in SQL mode.
+    // typed endpoint that rejects those matchers (`query::metrics::check`, v0.6.0), TQL is not
+    // available in SQL mode; PromQL runs on the Metrics page.
     if sql
         .trim_start()
         .get(..3)
         .is_some_and(|p| p.eq_ignore_ascii_case("tql"))
     {
-        return no("TQL is not available in SQL mode; PromQL arrives with Metrics in v0.6.0");
+        return no("TQL is not available in SQL mode; run PromQL on the Metrics page");
     }
     // GreptimeDB accepts `DESC TABLE t`; the MySQL dialect only knows `DESC t`.
     let normalised = strip_desc_table(sql);
