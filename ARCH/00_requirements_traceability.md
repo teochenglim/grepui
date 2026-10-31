@@ -102,4 +102,5 @@ Parity with the reference platform is tracked in [07_parity_matrix.md](07_parity
 | R-AI10 | LLM | Alerts can use LLM metrics (cost, tokens, error rate, latency percentile) as a condition, per model or in total |
 | R-D1 | Delivery | `VERSION` is the single source; `Cargo.toml` matches; the binary reports it |
 | R-D2 | Delivery | The banned product name appears nowhere in the tree (`make no-banned-names`) |
+| R-D4 | Delivery | The README and the two AsciiDoc guides (`docs/guide/`) are true: every screenshot and link exists, every menu page is described, every flag, variable, command and listed route is documented, checked by `tests/ac_docs.rs` |
 | R-D3 | Delivery | CI and release workflows pin every action to a commit SHA; release is tag-driven and the tag must equal `VERSION` |

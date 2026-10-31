@@ -1,0 +1,556 @@
+= grepui Technical Guide
+:doctype: book
+:toc: left
+:toclevels: 2
+:sectnums:
+:imagesdir: ../../images
+:icons: font
+:source-highlighter: highlight.js
+
+[abstract]
+This guide is for the people who install, run and secure grepui. It covers what grepui is made of, how to start it, every setting,
+how orgs, roles and single sign-on work, how data gets in, how to run it in production, and the HTTP API.
+For day-to-day use of the web pages see the xref:user-guide.adoc[User Guide].
+
+== What grepui is
+
+grepui is one Rust program (a single static binary, or one container image) that serves a web UI and a JSON API.
+It reads telemetry from GreptimeDB over GreptimeDB's MySQL protocol. It has *one dependency*: GreptimeDB.
+GreptimeDB holds your telemetry _and_ grepui's own state (users, dashboards, alert rules, audit trail) in tables whose names start with `grepui_`.
+
+[source]
+----
+browser (HTML + ES modules, no build step)
+   |  /api/v1/orgs/{org}/...
+   v
+grepui (Rust, axum; one or many replicas)
+   |  MySQL protocol                      +--> optional extra GreptimeDB sources
+   v
+GreptimeDB   (telemetry tables + grepui_* state tables)
+   ^
+   |  OTLP / Prometheus remote write, sent by your collectors and SDKs, never through grepui
+----
+
+What this means in practice:
+
+* There is no Node, no second database and no message queue to run.
+* grepui does not ingest. Your collectors write straight to GreptimeDB; the *Connect* page shows how.
+* Replicas share nothing but GreptimeDB. Alert rules are coordinated by a lease row per rule, so two replicas do not both fire the same alert.
+
+=== Supported GreptimeDB
+
+*GreptimeDB v1.3.0 and newer.* At start-up grepui reads the server version and logs a warning if it is older.
+Older versions return wrong answers for some joins and sub-queries that grepui relies on, so they are not supported.
+
+== Install
+
+=== Option 1: try it with the demo data
+
+Needs Docker and the repository checked out.
+
+[source,sh]
+----
+make db-up        # GreptimeDB v1.3.0 in Docker (HTTP 4000, MySQL 4002)
+make playground   # creates a `demo` database with demo logs and traces, then serves http://127.0.0.1:8080
+----
+
+Or run both in one command: `make demo`.
+
+The playground signs in as `admin` with password `grepui-demo-admin` and turns admin writes on. It writes demo data _only_ into a database named `demo` or `demo_*`, only when it is empty.
+Never use the playground for production.
+
+=== Option 2: the container image
+
+[source,sh]
+----
+docker run -d --name grepui -p 8080:8080 \
+  -e GREPUI_LISTEN=0.0.0.0:8080 \
+  -e GREPTIME_MYSQL=mysql://grepui:secret@greptimedb:4002/public \
+  -e GREPTIME_HTTP_PUBLIC=https://greptime.example.com \
+  ghcr.io/teochenglim/grepui:latest
+----
+
+The image is small (distroless, runs as a non-root user), exposes port 8080 and has a built-in health check (`grepui healthcheck`).
+
+=== Option 3: the binary
+
+Each release publishes tarballs for Linux and macOS on amd64 and arm64, each with a `.sha256` file. Unpack and run:
+
+[source,sh]
+----
+./grepui migrate --wait 30      # once, and after upgrades
+./grepui serve
+----
+
+=== Option 4: build from source
+
+[source,sh]
+----
+make build        # needs a Rust toolchain; the UI is embedded, no JS tooling
+./bin/grepui serve
+----
+
+== First start, step by step
+
+. *Have a GreptimeDB.* Collectors should already write OTLP data to it (see <<_sending_data>>).
+. *Create grepui's own tables.* Run `grepui migrate`. It is safe to repeat. Until you do, the state endpoints answer 503 and `serve` logs a warning.
+. *Start the server:* `grepui serve`.
+. *Open the address.* On first visit grepui asks for the first administrator; choose a user name and a password of at least 10 characters. This works only while no user exists.
+. *Add your org.* Sign in, open *Platform*, and create an org. An org is a name plus the GreptimeDB database it reads. Tick _create database_ if it does not exist yet.
+. *Add people* under *Administration > Members*.
+
+Before step 4 anyone who can reach the port can claim the first administrator account. Do the first sign-in from a trusted network, or put the service behind your reverse proxy first.
+
+=== The default org
+
+The org called `default` comes from the start-up flags, not from the state store: its database is the path of `--greptime-mysql`, and its tables are `--traces-table` and `--logs-table`.
+That makes a single-team installation work with no extra setup. Additional orgs are created in the UI and each carries its own database and table names.
+
+=== Account and permissions
+
+Run grepui with a GreptimeDB account that can *read* your telemetry databases and *write* the `grepui` database (`--meta-database`).
+With `--read-only-user`, grepui tries at start-up to create a probe table in the default org's database and warns if that succeeds,
+so you find out if the account is more powerful than needed.
+
+== Configuration
+
+Every setting is a command-line flag with an environment variable. Flags win over the environment.
+
+=== Core
+
+[cols="2,2,2,3"]
+|===
+|Flag |Environment |Default |Meaning
+
+|`--listen`
+|`GREPUI_LISTEN`
+|`127.0.0.1:8080`
+|Address to listen on. Use `0.0.0.0:8080` in containers.
+
+|`--greptime-mysql`
+|`GREPTIME_MYSQL`
+|`mysql://root@127.0.0.1:4002/public`
+|MySQL-protocol URL. The path is the default org's database.
+
+|`--greptime-http-public`
+|`GREPTIME_HTTP_PUBLIC`
+|`http://127.0.0.1:4000`
+|GreptimeDB's address _as your collectors reach it_. Shown on Connect.
+
+|`--traces-table`
+|`GREPUI_TRACES_TABLE`
+|`opentelemetry_traces`
+|Traces table of the default org.
+
+|`--logs-table`
+|`GREPUI_LOGS_TABLE`
+|`opentelemetry_logs`
+|Logs table of the default org.
+
+|`--meta-database`
+|`GREPUI_META_DATABASE`
+|`grepui`
+|Database for grepui's own state.
+
+|`--query-timeout-secs`
+|`GREPUI_QUERY_TIMEOUT_SECS`
+|`30`
+|Per-query timeout, 1 to 600.
+
+|`--pool-max-connections`
+|`GREPUI_POOL_MAX_CONNECTIONS`
+|`8`
+|Connections to GreptimeDB per source, 1 to 100.
+
+|`--shutdown-grace-secs`
+|`GREPUI_SHUTDOWN_GRACE_SECS`
+|`30`
+|Time to let running requests finish after SIGTERM or Ctrl-C.
+
+|`--read-only-user`
+|`GREPUI_READ_ONLY_USER`
+|off
+|Warn at start-up if the database account can create tables.
+|===
+
+=== Writes and background work
+
+[cols="2,2,2,3"]
+|===
+|Flag |Environment |Default |Meaning
+
+|`--admin-writes`
+|`GREPUI_ADMIN_WRITES`
+|off
+|Allows rollup create/backfill/drop and retention (TTL) changes. Off means those pages are read-only.
+
+|`--no-alerts`
+|`GREPUI_NO_ALERTS`
+|off
+|Do not run the alert scheduler in this process (a UI-only replica).
+
+|`--smtp`
+|`GREPUI_SMTP`
+|none
+|`host:port` of a plain SMTP relay for alert and report email. No TLS and no login: use a relay on a trusted network.
+
+|`--smtp-from`
+|`GREPUI_SMTP_FROM`
+|`grepui@localhost.localdomain`
+|Sender address.
+
+|`--pipeline-http`
+|`GREPUI_PIPELINE_HTTP`
+|`--greptime-http-public`
+|Where grepui calls GreptimeDB's pipeline API. Set it when the public address is not reachable from grepui.
+|===
+
+=== Sign-in and API tokens
+
+[cols="2,2,2,3"]
+|===
+|Flag |Environment |Default |Meaning
+
+|`--no-auth`
+|`GREPUI_NO_AUTH`
+|off
+|Switch sign-in off: everyone is an admin and nothing is audited. Refused on a non-loopback address.
+
+|`--session-hours`
+|`GREPUI_SESSION_HOURS`
+|`12`
+|How long a sign-in lasts.
+
+|`--token-rate-per-min`
+|`GREPUI_TOKEN_RATE`
+|`600`
+|Requests per minute one API token may make.
+
+|`--metrics-token`
+|`GREPUI_METRICS_TOKEN`
+|none
+|A bearer token (16 characters or more) that may read `/metrics`. Without it a platform admin is needed.
+|===
+
+=== Single sign-on (OpenID Connect)
+
+Set all of the first six, or none.
+
+[cols="2,2,3"]
+|===
+|Flag |Environment |Meaning
+
+|`--oidc-issuer`
+|`GREPUI_OIDC_ISSUER`
+|The `iss` of the ID tokens.
+
+|`--oidc-client-id`, `--oidc-client-secret`
+|`GREPUI_OIDC_CLIENT_ID`, `GREPUI_OIDC_CLIENT_SECRET`
+|Credentials from your provider.
+
+|`--oidc-auth-url`, `--oidc-token-url`, `--oidc-jwks-url`
+|`GREPUI_OIDC_AUTH_URL`, `GREPUI_OIDC_TOKEN_URL`, `GREPUI_OIDC_JWKS_URL`
+|The provider's endpoints (http or https).
+
+|`--oidc-redirect-url`
+|`GREPUI_OIDC_REDIRECT_URL`
+|This grepui's callback, for example `https://grepui.example.com/api/v1/auth/oidc/callback`. Register the same URL with your provider.
+
+|`--oidc-scopes`
+|`GREPUI_OIDC_SCOPES`
+|Default `openid profile email`.
+
+|`--oidc-role-claim`
+|`GREPUI_OIDC_ROLE_CLAIM`
+|The claim holding groups or roles. Default `groups`.
+
+|`--oidc-role-map`
+|`GREPUI_OIDC_ROLE_MAP`
+|Rules `value=role@org` (role is viewer, editor or admin) or `value=platform_admin`, repeated or separated by `;`.
+|===
+
+Example: members of the group `sre` become admins of the org `prod`, and `platform` members become platform administrators:
+
+[source,sh]
+----
+GREPUI_OIDC_ROLE_MAP='sre=admin@prod;dev=viewer@prod;platform=platform_admin'
+----
+
+=== Cache and extra sources
+
+[cols="2,2,2,3"]
+|===
+|Flag |Environment |Default |Meaning
+
+|`--cache-ttl-secs`
+|`GREPUI_CACHE_TTL_SECS`
+|`5`
+|Result cache lifetime; `0` turns it off. Identical concurrent queries run once either way.
+
+|`--cache-max-entries`, `--cache-max-mb`
+|`GREPUI_CACHE_MAX_ENTRIES`, `GREPUI_CACHE_MAX_MB`
+|`1000`, `64`
+|Cache size limits.
+
+|`--source name=mysql://…`
+|`GREPUI_SOURCES` (separate with `;`)
+|none
+|Extra GreptimeDB servers. The org databases must exist on each. Logs search and traces can fan out to them and merge by time.
+|===
+
+=== Commands
+
+[cols="1,3"]
+|===
+|Command |Purpose
+
+|`grepui serve`
+|Run the UI and API.
+
+|`grepui migrate [--print] [--wait N]`
+|Create or upgrade grepui's own tables. Idempotent. `--print` shows the SQL and connects to nothing; `--wait` retries while GreptimeDB starts.
+
+|`grepui playground --demo-data [--wait N] [--traces N] [--minutes N] [--seed N] [--no-live] [--force] [--llm-data]`
+|Wait for GreptimeDB, seed demo data into a `demo` database, then serve. `--llm-data` also seeds OpenInference traces into a v2 table called `llm_traces`.
+
+|`grepui healthcheck`
+|Exits 0 when a running instance answers `/healthz`. Used by the container health check.
+|===
+
+== Orgs, roles and who sees what
+
+An *org* maps to one GreptimeDB database. Every API route starts with `/api/v1/orgs/{org}/`, and grepui never works out a database from request text.
+
+[cols="1,3"]
+|===
+|Role |Allowed
+
+|viewer
+|Read data, dashboards, alerts, history.
+
+|editor
+|Also write saved views, dashboards, alert rules, functions and feedback.
+
+|admin
+|Also members, tokens, work groups, redaction, retention and rollups (with `--admin-writes`), prices, branding, reports; read LLM prompts.
+
+|platform admin
+|Also create orgs and users, and manage sources and platform-wide audit. Platform admins are not automatically admins of every org.
+|===
+
+The route table is deny-by-default: a route that is not classified is refused, and a test walks every route to prove the classification.
+
+=== API tokens
+
+An org admin creates a token under *Administration > API tokens*. The token is shown once and carries a role. Use it as a bearer token:
+
+[source,sh]
+----
+curl -H "Authorization: Bearer $TOKEN" \
+  "https://grepui.example.com/api/v1/orgs/prod/logs?from=1730000000000&to=1730003600000&q=level%3Derror&limit=20"
+----
+
+Tokens are rate-limited by `--token-rate-per-min`. Browser sessions use an HttpOnly, SameSite=Strict cookie plus a CSRF check on writes.
+
+=== Audit
+
+With sign-in on, every read and change is queued and written to the audit table. Admins search it under *Administration > Audit*; platform admins see all orgs.
+Audit is not recorded with `--no-auth`.
+
+image::ui_admin_audit.png[The audit trail,width=90%]
+
+== Sending data
+
+grepui reads what GreptimeDB holds. The *Connect* page shows ready snippets using your `--greptime-http-public` address. In short:
+
+* *OTLP/HTTP* to GreptimeDB at `/v1/otlp/v1/traces`, `/v1/otlp/v1/logs` and `/v1/otlp/v1/metrics`, with the header `x-greptime-db-name` (the org's database); traces also send `x-greptime-pipeline-name: greptime_trace_v1` and `x-greptime-trace-table-name`, logs send `x-greptime-log-table-name`.
+* *Prometheus remote write* to `/v1/prometheus/write?db=<database>`.
+* *LLM traces* (OpenInference or OTel GenAI) go to the _trace v2_ pipeline into a table of their own; the Connect page has the header values, a Python example and a collector snippet. Use an org whose traces table is that table. A flat table is detected and the LLM pages refuse it with a pointer back to Connect.
+
+image::ui_connect.png[The Connect page,width=90%]
+
+NOTE: The exact header names and paths come from GreptimeDB. Copy them from the Connect page rather than from this guide; the page is generated for your version.
+
+== Running in production
+
+=== Put it behind TLS
+
+grepui speaks plain HTTP. Terminate TLS in front of it (nginx, Caddy, a cloud load balancer) and forward `Host` and the original scheme. The session cookie is HttpOnly and SameSite=Strict.
+
+[source,nginx]
+----
+server {
+  listen 443 ssl;
+  server_name grepui.example.com;
+  location / {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}
+----
+
+=== Replicas
+
+Run as many replicas as you need behind a load balancer. Sessions, tokens and rules live in GreptimeDB, so any replica can answer any request.
+Alert rules run on whichever replica holds the lease for the rule, one at a time. To keep a replica free of background work, start it with `--no-alerts`.
+
+=== Observing grepui itself
+
+`GET /healthz` is liveness. `GET /api/v1/health` is readiness (it talks to the database). `GET /metrics` serves Prometheus text:
+request counts, database latency, cache hits and alert evaluations. It needs a platform admin session or the `--metrics-token` bearer.
+
+[source,yaml]
+----
+scrape_configs:
+  - job_name: grepui
+    metrics_path: /metrics
+    authorization: { credentials: "<your --metrics-token>" }
+    static_configs: [{ targets: ["grepui:8080"] }]
+----
+
+=== Upgrading
+
+. Pull the new image or binary.
+. Run `grepui migrate` (idempotent; it moves the state schema forward).
+. Restart. Shutdown is graceful: running requests get `--shutdown-grace-secs` to finish.
+. Reload browsers once; the scripts are embedded in the binary and a stale tab may keep the old ones.
+
+=== Limits to keep in mind
+
+* Every query window is at most 31 days, and result sizes are capped. Longer views use a *rollup*.
+* A rollup is a GreptimeDB Flow that keeps per-minute service figures. Creating, backfilling and dropping one, and changing TTLs, needs `--admin-writes`.
+* Percentiles on the LLM pages are approximate.
+* Email uses a plain SMTP relay and webhooks are plain `http://`; neither does TLS or authentication.
+* Load testing at large scale has not been done as part of the releases; a 7-day trace list over about 10 million spans did not finish in a trial run. Use rollups and shorter windows for very large trace tables.
+
+== Security model
+
+[cols="1,3"]
+|===
+|Control |What it does
+
+|Typed API
+|Clients send parameters, not SQL. Every statement is tagged with its name (`/* q:logs_search */`) and every value is a bound parameter.
+
+|SQL mode
+|The only place a user writes SQL (and in dashboard SQL panels and alert rules). A parser allows one read-only statement, confined to the org's database. It refuses writes, TQL and any `grepui_*` table.
+
+|Write allowlist
+|grepui may write only its own `grepui_*` tables, admin-gated DDL for rollups and TTL (with `--admin-writes`), and the playground's demo data.
+
+|Deny-by-default routes
+|Each route has a minimum role; unlisted routes are refused.
+
+|Redaction
+|Admins define masks; they apply to every data response and export. Prompts and completions of LLM spans are masked below admin.
+
+|Security headers
+|Every response carries a Content-Security-Policy (no inline script, no eval, no framing), `nosniff`, no referrer, a locked-down permissions policy and COOP.
+
+|Dashboards
+|Text panels are cleaned and shown in a sandboxed frame. Panels run only the query stored with them.
+
+|Supply chain
+|Dependencies are checked with `cargo deny` and `cargo audit`; CI runs Semgrep and Trivy.
+|===
+
+The most recent review is in `docs/security-review-0.17.0.md`.
+
+== HTTP API
+
+The UI is a client of the same API. Everything is JSON.
+
+* Data routes: `GET /api/v1/orgs/{org}/...`, returning `{ "data": ..., "meta": { "query", "sql", "binds", "ms", "rows", "source" } }`.
+* Windows: `from` and `to` as epoch milliseconds, at most 31 days. Row limits are capped.
+* Errors: `{ "error": "message" }` with a matching status code.
+* Authentication: `Authorization: Bearer <token>` or the session cookie.
+
+=== A few routes
+
+[cols="2,3"]
+|===
+|Route |Purpose
+
+|`/healthz`, `/api/v1/health`, `/api/v1/info`, `/api/v1/orgs`
+|Liveness, readiness, version, the orgs you can see.
+
+|`/streams`, `/streams/{name}`, `/streams/{name}/stats`
+|Tables and their schema.
+
+|`/logs?from&to&q&level&limit&offset`
+|Log search; `q` is the filter bar syntax.
+
+|`/logs/histogram`, `/logs/fields`, `/logs/export?format=csv\|ndjson`
+|Hits over time, field list, download.
+
+|`/traces?from&to&q&service&errors&min_ms`
+|One row per trace.
+
+|`/traces/{id}`, `/traces/{id}/flame`, `/traces/{id}/agent-graph`
+|Waterfall and span data, flame graph, LLM agent graph.
+
+|`/sql?sql&from&to&limit`
+|SQL mode (read-only).
+
+|`/llm/overview`, `/llm/breakdown?by=model\|provider\|kind\|tool`, `/llm/sessions`, `/llm/users`
+|LLM analytics.
+
+|`/dashboards`, `/alerts`, `/views`, `/functions`, `/pipelines`
+|Saved objects.
+|===
+
+=== The API is frozen
+
+Since v0.17.0 the shape of every response and the access level of every route are recorded in `tests/golden/`.
+A change to either fails a test until the change is reviewed, so scripts that use the API are not broken by accident.
+The full list of routes, their methods and the role they need is `tests/golden/routes.txt`.
+
+== Troubleshooting
+
+[cols="2,3"]
+|===
+|Symptom |Cause and fix
+
+|`serve` warns "state store is not initialised"
+|Run `grepui migrate`.
+
+|Pages say 503 for views, dashboards or alerts
+|Same: the `grepui_*` tables are missing, or the account cannot write the `grepui` database.
+
+|Start-up warns about the GreptimeDB version
+|Upgrade GreptimeDB to v1.3.0 or newer.
+
+|`--no-auth` refused
+|It is allowed only on a loopback address (`127.0.0.1`).
+
+|Everything is empty
+|Check the org's database and table names (Platform for orgs; flags for the default org) and that the collectors write to the same database.
+
+|Rollup or retention buttons are disabled
+|Start with `--admin-writes`.
+
+|Alerts never fire
+|Is this process started with `--no-alerts`? Does the account write the state database? Use the rule preview to see the value it would compute.
+
+|Email is not sent
+|Set `--smtp`. The relay must accept mail without TLS or login.
+
+|OIDC sign-in fails
+|The redirect URL registered with the provider must equal `--oidc-redirect-url` exactly; check the role-map rules for typos.
+
+|A page uses old scripts after upgrading
+|Hard-reload the browser.
+|===
+
+To see exactly what grepui asked the database, use *Show SQL* on any page. For server-side detail set `RUST_LOG=debug`.
+
+== Building and testing
+
+[source,sh]
+----
+make check      # format, lint, requirement-to-test map, tests, version, banned-name check
+make test-db    # live tests against GreptimeDB (make db-up first)
+----
+
+Architecture notes are in `ARCH/`, one decision record per choice in `docs/adr/`, and the plan and changelog in `RELEASE.md`.

@@ -2,7 +2,7 @@
 
 The single place to see where grepui stands: what is shipped, what is planned, what each release proves, and how a release is cut. Per-release detail (scope, acceptance criteria, named tests, checklist) lives in [`RELEASE/vX.Y.Z.md`](RELEASE/README.md); this file is the readable roll-up and the changelog.
 
-> **Current state:** v0.1.0 to v0.17.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.12.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
+> **Current state:** v0.1.0 to v0.18.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.12.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
 
 ## 1. Summary
 
@@ -13,7 +13,7 @@ grepui is a multi-tenant observability UI for GreptimeDB: one Rust binary (axum)
 | Language / runtime | Rust (edition 2024), axum 0.8, sqlx (MySQL protocol to GreptimeDB), no Node anywhere |
 | Pinned GreptimeDB | `v1.3.0` (`GREPTIME_VERSION` in the Makefile, the compose file, CI); v1.2.x is unsupported |
 | Tenancy | Multi-tenant from v0.1.0: org-scoped routes; orgs map to GreptimeDB databases |
-| Releases planned | 17 (v0.1.0 to v0.17.0), then v1.0.0 (vision only) |
+| Releases planned | 18 (v0.1.0 to v0.18.0), then v1.0.0 (vision only) |
 | Requirements | 80 (`ARCH/00_requirements_traceability.md`) |
 | Acceptance criteria | 82, each governed by at least two named tests (`make ac-map`) |
 | Licence | Apache-2.0 |
@@ -21,11 +21,12 @@ grepui is a multi-tenant observability UI for GreptimeDB: one Rust binary (axum)
 
 ## 2. Release status
 
-Latest built: **v0.17.0: Hardening** (ready). Newest first.
+Latest built: **v0.18.0: Documentation** (ready). Newest first.
 
 | Release | Theme | Status | ACs | Requirements covered |
 |---|---|---|---|---|
 | [v1.0.0](RELEASE/v1.0.0.md) | Better than the reference platform, shown by evidence (vision only) | planned | 0 | none yet |
+| [v0.18.0](RELEASE/v0.18.0.md) | Documentation (User Guide, Technical Guide in AsciiDoc; README with screenshots) | ready | 3 | R-D4 |
 | [v0.17.0](RELEASE/v0.17.0.md) | Hardening (golden API shapes, supported version, security review, security headers) | ready | 4 | R-C2 R-F4 R-Q1 R-O3 R-O4 |
 | [v0.16.0](RELEASE/v0.16.0.md) | LLM traces, metric-level views (analytics, sessions, alerts) | ready | 3 | R-AI5 R-AI6 R-AI10 |
 | [v0.15.0](RELEASE/v0.15.0.md) | LLM traces, trace-level views (span views, evaluations, agent graph, content protection) | ready | 5 | R-AI3 R-AI4 R-AI7 R-AI8 R-AI9 |
@@ -64,6 +65,12 @@ Newest first. An entry is written when a release becomes `ready`; the same text 
 ### Unreleased
 
 - Requirements, architecture, positioning and parity matrix (ARCH 00–07), release plan with ACs for v0.1.0–v0.17.0, `scripts/seed.py` (demo traces and logs over OTLP/protobuf, `--db` per org).
+
+### v0.18.0: Documentation (ready)
+
+Added: a User Guide and a Technical Guide in AsciiDoc (`docs/guide/`), and a README rewritten for a first-time reader with 11 screenshots, a two-minute try-it, a tour, using your own data, a safety summary and links. The User Guide describes every page of the menu with 45 screenshots, the roles and the LLM views; the Technical Guide covers install (demo, image, binary, source), first start, every flag and environment variable, single sign-on, orgs, API tokens, TLS and replicas, `/metrics`, upgrade, limits, the security model, the API and troubleshooting. `tests/ac_docs.rs` fails when a named screenshot or link is missing, a menu page is not described, or a flag, variable, command or listed route is missing from or wrong in the guide.
+
+No code, route, schema or flag change. Limits: not viewed on GitHub or in a browser (converted locally with Asciidoctor.js, 0 warnings); no PDF; screenshots are from the earlier releases' browser passes; prose cannot be tested, only the facts that can be checked.
 
 ### v0.17.0: Hardening (ready)
 

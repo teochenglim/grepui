@@ -1,0 +1,411 @@
+= grepui User Guide
+:doctype: book
+:toc: left
+:toclevels: 2
+:sectnums:
+:imagesdir: ../../images
+:icons: font
+:source-highlighter: highlight.js
+
+[abstract]
+grepui is a web page for looking at the logs, traces, metrics and LLM calls that your applications send to GreptimeDB.
+This guide is for the people who _use_ it: engineers on call, developers chasing a bug, and teams watching cost.
+You do not need to know SQL, although grepui will show you the SQL it ran whenever you want to see it.
+Installing and running grepui is covered in the xref:technical-guide.adoc[Technical Guide].
+
+== Before you start
+
+You need three things from whoever runs grepui for you:
+
+* the address of grepui (for example `https://grepui.example.com`, or `http://127.0.0.1:8080` on your own machine);
+* a user name and password, or a "sign in with" button from your company login;
+* the name of the *org* you belong to.
+
+An *org* is a team's own space. It owns one GreptimeDB database, so you only ever see your team's data.
+If you belong to several orgs, you switch between them at the top of the page.
+
+=== Roles
+
+Every person has a role in each org. The role decides what the buttons do.
+
+[cols="1,4"]
+|===
+|Role |What you can do
+
+|viewer
+|Look at everything: logs, traces, services, metrics, dashboards, alerts. Prompts and completions of LLM calls are masked.
+
+|editor
+|Everything a viewer can, plus save views, build dashboards, write alert rules, leave feedback on LLM traces.
+
+|admin
+|Everything an editor can, plus members, API tokens, work groups, retention, rollups, branding, redaction rules and the audit trail. Admins can read LLM prompts.
+|===
+
+If a button is missing or a save is refused with "forbidden", you need a higher role: ask an admin of your org.
+
+== Sign in
+
+Open the address in your browser. The first time grepui is ever started, it asks for the *first administrator*:
+choose a user name and a password of 10 or more characters. That account becomes the platform administrator.
+
+image::ui_signin.png[The sign-in page,width=60%]
+
+After that, everyone signs in with a user name and password, or with the single sign-on button when your company has set it up.
+The sign-in lasts 12 hours unless your administrator changed it. *Sign out* is at the top right, next to your name and role.
+Local users can change their own password with the *Password* button.
+
+TIP: Started with `--no-auth`, grepui shows a yellow "no sign-in" badge and everyone is an administrator.
+That is for a laptop only.
+
+== Finding your way around
+
+The left column lists the pages. The top bar has the same four controls on every page.
+
+* *Org switcher*: pick which team's data you are looking at.
+* *Time range*: "last 15 minutes", "last 24 hours", or an exact window. The range follows you from page to page, so a spike you found on Services is still selected when you open Traces.
+* *Show SQL*: opens a drawer with the exact SQL, the values it was given, how many rows came back and how long it took. Nothing is hidden.
+* *Your name*: password and sign-out.
+
+image::ui_streams.png[The Streams page: every table in the org, its kind and a row estimate]
+
+Every window is at most 31 days, and every list is capped (usually at 1,000 rows), so a page never runs away.
+
+=== Links you can share
+
+The address in your browser contains the page, the org, the time range and the filters. Copy it into chat and your colleague sees what you see.
+Saved views (below) and dashboards can also be shared by link.
+
+== Streams: what data do we have?
+
+*Streams* lists every table in your org's database: logs, traces, metrics and anything else. Click one to see its columns,
+the exact row count, the time it covers, a few of the newest rows, its size, its time-to-live (TTL) and its indexes.
+
+image::ui_stream_detail.png[One stream: columns, row count, time span and newest rows]
+
+== Data health: is data arriving?
+
+*Data health* answers "is my telemetry flowing?". It shows the newest row of every stream, how fast rows arrive, and warns when a service has gone quiet.
+Open it first when a graph looks empty.
+
+image::ui_health.png[Data health: newest row per stream, rate, and quiet services]
+
+== Logs
+
+*Logs* is where most investigations start.
+
+image::ui_logs.png[The Logs page: filter bar, histogram, field list and results]
+
+=== Searching
+
+Type in the filter bar and press Enter. Words are combined with AND.
+
+[cols="2,3"]
+|===
+|You type |It means
+
+|`level=error`
+|the field `level` equals `error`
+
+|`http.method!=GET`
+|the field is not `GET`
+
+|`message~timeout`
+|the field contains `timeout`
+
+|`"upstream timeout"`
+|the text, anywhere in the record
+
+|`service.name=checkout level=error "card declined"`
+|all three at once
+|===
+
+The bar chart above the results shows how many records matched in each slice of time.
+
+=== Reading a record
+
+Click a row to open it. You see every field, with a button to filter on it. *Search around* shows the records stored just before and after this one,
+which is how you see what happened around an error.
+
+image::ui_logs_detail.png[An expanded log record with its fields and Search around]
+
+The *fields* list on the left shows each column with its type and the most common values. Click a value to add it to the filter.
+
+=== Saving what you found
+
+Save a search as a *view* with a name. Saved views can be shared by link. The page also remembers your last searches.
+
+image::ui_views.png[Saved views and recent searches]
+
+=== Exporting
+
+The export links download the matching records as CSV or NDJSON (up to 10,000 rows).
+
+=== SQL mode
+
+Prefer SQL? Switch to *SQL mode* and write one `SELECT`. Use `$__from` and `$__to` for the selected time range.
+
+image::ui_logs_sql.png[SQL mode]
+
+SQL mode is read-only. It refuses anything that changes data, anything outside your org's database and grepui's own tables.
+
+=== Several sources
+
+If your administrator has added more GreptimeDB servers, a *Source* picker appears next to the filter bar. Choose one source or _All sources_ and the results are merged by time.
+
+image::ui_logs_sources.png[Searching several sources at once]
+
+== Traces
+
+A *trace* is the story of one request as it moves through your services. Each step is a *span*.
+
+image::ui_traces.png[The Traces page: histogram, latency scatter and one row per trace]
+
+The page shows traces over time, a scatter of latency (each dot is a trace; slow ones are high), and one row per trace.
+Filters work on the same span: `service=checkout status=error` finds traces where one span is both. A *min ms* box finds slow traces.
+
+=== The waterfall
+
+Click a trace. The *waterfall* draws each span as a bar, indented under its parent, so you can see where the time went.
+Click a span to open its panel: attributes, events, errors, and the *logs for this span*. From any log record there is also a link back to its trace.
+
+image::ui_trace_detail.png[A trace waterfall and span panel]
+
+The *flame graph* tab merges all spans of the trace by name, which is useful for traces with thousands of spans.
+
+image::ui_trace_flame.png[A flame graph]
+
+== Services
+
+*Services* lists each service with its request *rate*, *error* rate and *latency* (the RED numbers). Click one for its charts and its slowest operations.
+
+image::ui_service_detail.png[A service: rate, errors, latency and operations]
+
+The *Service map* draws which service calls which, with the error rate and call count on each arrow.
+
+image::ui_service_map.png[The service map]
+
+The *Catalog* is a short card for each service: owner, tier and a runbook link. Fill it in so the person on call knows who to wake.
+
+image::ui_catalog.png[The service catalog]
+
+== Metrics
+
+*Metrics* runs PromQL against the metrics GreptimeDB holds. Pick a metric from the list or type a query, choose line, bar or table, and share the link.
+
+image::ui_metrics.png[The Metrics page]
+
+== Dashboards
+
+A *dashboard* is a page of panels you build once and keep. Create one from *Dashboards*, then add panels.
+
+image::ui_dashboards.png[The dashboards list, with folders]
+
+* There are many panel types: line, area, bar (stacked or not), scatter, pie, donut, heat map, stat, gauge, table, map, sankey, and text panels (markdown or HTML, which is cleaned and shown in a sandbox).
+* A panel runs the query you saved with it. *Variables* (for example a service or an environment) appear at the top and change every panel at once.
+* Set a refresh interval, and compare against the previous period.
+* *Export* a dashboard as JSON and *import* it into another org.
+
+image::ui_dashboard.png[A dashboard with several panels]
+
+=== Sharing and TV mode
+
+Give a dashboard a *public link* to show it to someone who has no account. Public links are read-only and always hide LLM prompts.
+*TV mode* shows a dashboard full screen, and a *playlist* rotates through several.
+
+image::ui_dashboard_public.png[A dashboard opened through a public link]
+
+== Alerts
+
+An *alert rule* checks something on a schedule and tells you when it is true.
+
+image::ui_alerts_list.png[The alert list]
+
+. Open *Alerts* and choose *New rule*.
+. Choose what to check: a *builder* (pick a stream and a measure), a *SQL* query, a *PromQL* query or an *LLM* measure. You also set the threshold. A preview shows what the rule sees right now and writes nothing.
+. Set how often it runs and how long it must stay true.
+. Choose where to send it: a *webhook* (plain `http://`) or *email*, using a message template.
+
+image::ui_alert_editor.png[The alert editor with a preview]
+
+Useful settings:
+
+* *Dedup and cooldown* stop the same alert from firing again and again.
+* *Downtimes* silence rules during maintenance.
+* A rule can be *scheduled*, *real-time*, *composite* (an AND or OR of other rules) or *anomaly* (it fires when a value strays from its usual pattern).
+* Every firing is kept in *History*; related firings are grouped into *Incidents* that you can acknowledge and resolve.
+
+image::ui_alert_incidents.png[Incidents]
+
+image::ui_alert_destinations.png[Alert destinations]
+
+== LLM observability
+
+If your application sends traces from an LLM library that speaks OpenInference or OpenTelemetry GenAI, grepui understands them.
+The LLM pages need an org whose traces table uses the _trace v2_ layout (see the Connect page for how to send to it).
+
+=== Reading one LLM trace
+
+On *Traces*, chips filter by kind: model call, tool, retriever, agent and so on. Open a trace and click a model call to see the
+*conversation* (system, user and assistant messages), the tool calls, retrieved documents, token counts and cost.
+
+image::ui_trace_llm_span.png[An LLM span: conversation, tool call, tokens and cost]
+
+The *LLM steps* tab lists the model calls in order, and the *agent graph* draws which agent or tool called which.
+
+image::ui_trace_llm_steps.png[LLM steps in order]
+
+image::ui_agent_graph.png[The agent graph of one trace]
+
+Editors can leave *feedback* (thumbs, a score, a note) on a trace or a span, and any evaluation scores your tooling attached are shown beside it.
+
+=== The LLM page
+
+*LLM* shows calls, tokens, cost, error rate and latency (p50, p95, p99) for the window, broken down by model, provider, kind and tool.
+
+image::ui_llm_overview.png[The LLM overview]
+
+*Sessions* groups calls by conversation. Open one to read it turn by turn. *Users* groups by user.
+
+image::ui_llm_sessions.png[LLM sessions]
+
+If your tracing library does not report cost, an admin can enter a *price table* (dollars per million tokens, per model). Cost computed that way is marked
+_estimated_. A cost your library reported is never overwritten.
+
+=== Alerts on LLM numbers
+
+In the alert editor choose the *LLM* query: cost, tokens, calls, error rate or p95 latency, for all models or for each model separately.
+The preview shows the same numbers as the LLM page.
+
+image::ui_alert_llm.png[An alert on LLM error rate]
+
+=== Who can read prompts
+
+Prompts, completions, tool arguments and retrieved text are *masked for viewers and editors* and shown to admins. An admin can change this per org
+under *Administration > LLM* to _hidden_ (nobody below admin sees even a placeholder), _masked_ (the default) or _visible_.
+Public links always stay masked. The same rule applies to exports and reports.
+
+image::ui_admin_llm.png[Administration, LLM tab: prices and content mode]
+
+== Real user monitoring (RUM)
+
+If you use GrepRUM in your web pages, *RUM* shows page views, web vitals, errors and slow pages by site.
+
+image::ui_rum.png[The RUM page]
+
+== Pipelines, functions, enrichment and redaction
+
+These four pages shape data before and while you read it. They are mostly for admins and editors.
+
+* *Pipelines* manage GreptimeDB ingest pipelines, with a dry-run so you can test a pipeline on a sample before saving it.
++
+image::ui_pipelines.png[Pipelines]
+* *Functions* are saved SQL snippets that take arguments, so a colleague can reuse a query without copying text.
+* *Enrichment* uploads a CSV (for example a table of customers or hosts) and joins it to your logs.
++
+image::ui_enrichment.png[Enrichment]
+* *Redaction* hides or masks fields (card numbers, emails) in every answer and every export, per role.
++
+image::ui_redaction.png[Redaction rules]
+
+== Rollups and retention (admins)
+
+*Rollups* keep a per-minute summary of your traces so a 7-day or 30-day service chart stays fast. *Retention* sets how long each stream is kept,
+with an exact preview of what would be deleted before you confirm. Both change the database, so your administrator must have started grepui with `--admin-writes`.
+
+image::ui_rollups.png[Rollups]
+
+image::ui_retention.png[Retention]
+
+== Reports
+
+*Reports* (admins) email an HTML or CSV report on a schedule, built from a dashboard or a saved view. Reports apply the same redaction and prompt masking as the screen.
+
+image::ui_reports.png[Scheduled reports]
+
+== Administration (org admins)
+
+*Administration* has a tab for each job:
+
+[cols="1,4"]
+|===
+|Tab |Use it to
+
+|Members
+|Add people to the org and choose viewer, editor or admin.
+
+|API tokens
+|Create tokens for scripts. A token has a role and is shown once. Tokens are rate-limited.
+
+|Queries
+|See queries that are running right now and cancel one. Query statistics show which queries are slow.
+
+|Work groups
+|Set limits per role: how many queries at once, the longest time window, the most rows.
+
+|LLM
+|Prices and the prompt-visibility mode.
+
+|Audit
+|Search who read or changed what, and when.
+
+|Branding
+|Name, colours and logo for the org.
+|===
+
+image::ui_admin_members.png[Members]
+
+image::ui_admin_tokens.png[API tokens]
+
+image::ui_queries.png[Running queries]
+
+image::ui_workgroups.png[Work groups]
+
+image::ui_admin_audit.png[The audit trail]
+
+=== Platform administrators
+
+A *platform administrator* also sees *Platform*: create orgs (each maps to a database), create users, and turn extra data sources on or off.
+
+image::ui_platform.png[The Platform page]
+
+== Connect: sending data to grepui's database
+
+grepui does not collect telemetry itself. The *Connect* page shows, with copy buttons, how to send OTLP traces, logs and metrics, and Prometheus data,
+to the GreptimeDB behind your org.
+
+image::ui_connect.png[The Connect page]
+
+For LLM libraries there is a separate section with the headers, a Python example, environment variables and a collector snippet.
+
+image::ui_connect_llm.png[Connect, LLM section]
+
+== Tips and troubleshooting
+
+[cols="2,3"]
+|===
+|Problem |What to try
+
+|A chart is empty
+|Widen the time range. Open *Data health* to see whether data is arriving. Check the org switcher.
+
+|"window too large"
+|Windows are at most 31 days. For longer views ask an admin to create a rollup.
+
+|"forbidden"
+|Your role is too low for this action. Ask an org admin.
+
+|"too many requests" or "limit reached"
+|You hit a work-group or token limit. Wait a moment or ask an admin to raise it.
+
+|LLM page says the table is flat
+|The LLM pages need the trace v2 layout. See the LLM section of *Connect*.
+
+|Prompts show as masked text
+|That is the default for viewers and editors. Ask an admin if you need to read them.
+
+|A page behaves oddly after an upgrade
+|Reload the page. The browser may have cached the old scripts.
+|===
+
+Still stuck? Click *Show SQL* and send the statement, the error and the time to your administrator. They are the fastest way to find the cause.

@@ -18,6 +18,7 @@ The roll-up and changelog live in [`../RELEASE.md`](../RELEASE.md). One file per
 | [v0.12.0](v0.12.0.md) | Query management, work groups and federation | D3 | a quota stops an over-limit query before it runs; a running query is cancelled; two sources merge by time | 0.11 |
 | [v0.13.0](v0.13.0.md) | Reports, RUM view and operate | D3 D7 | a scheduled report arrives by email; RUM page renders from GrepRUM tables; two identical concurrent queries hit the DB once | 0.12 |
 | [v0.17.0](v0.17.0.md) | Hardening | all | API shapes frozen by golden files; GreptimeDB v1.3.0 is the one supported version, checked at start-up; security review recorded | 0.16 |
+| [v0.18.0](v0.18.0.md) | Documentation | none | README with screenshots, User Guide and Technical Guide (AsciiDoc); a test keeps flags, pages, routes, images and links true | 0.17 |
 | [v1.0.0](v1.0.0.md) | Better than the reference platform, shown by evidence | all | every comparison backed by a repo test or measurement; gap list closed; every ADR re-read (vision only) | 0.17 |
 
 ## Per-release workflow

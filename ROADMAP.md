@@ -4,7 +4,7 @@ Status per release is in `RELEASE.md` (roll-up) and `RELEASE/` (detail). This fi
 
 ## Release train (planned releases 0.9 to 1.0)
 
-1. **0.1 to 0.17 are built** (0.14 is LLM step L1, 0.15 is L2, L4, L5 and masking from L6, 0.16 is L3 and the alerts from L6) (foundation, logs, state and data health, traces, services and service map, metrics, rollups and retention, dashboards, alerts and incidents, pipelines/functions/enrichment/redaction); see `RELEASE.md`.
+1. **0.1 to 0.18 are built** (0.18 is documentation: the guides and the README) (0.14 is LLM step L1, 0.15 is L2, L4, L5 and masking from L6, 0.16 is L3 and the alerts from L6) (foundation, logs, state and data health, traces, services and service map, metrics, rollups and retention, dashboards, alerts and incidents, pipelines/functions/enrichment/redaction); see `RELEASE.md`.
 2. **1.0.0 is the evidence release** (vision only, `RELEASE/v1.0.0.md`).
 3. **0.7 Rollups and extended retention** (D5): long windows and TTL tiers.
 4. **0.8 Dashboards, 0.9 Alerts and incidents, 0.10 Pipelines/functions/enrichment/redaction**: the parity modules.
