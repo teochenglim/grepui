@@ -30,6 +30,8 @@ pub struct LogParams {
     q: Option<String>,
     level: Option<String>,
     format: Option<String>,
+    /// `all` or `a,b`: read from these sources and merge by time (v0.12.0).
+    sources: Option<String>,
 }
 
 /// Does `body` have a fulltext index? Asked of the database, cached briefly per org.
@@ -80,6 +82,7 @@ fn bad_table<T>(r: anyhow::Result<T>) -> Result<T, ApiError> {
 
 pub async fn search(
     State(s): State<Shared>,
+    axum::Extension(id): axum::Extension<crate::auth::Identity>,
     Path(org): Path<String>,
     Query(p): Query<LogParams>,
 ) -> Result<Response, ApiError> {
@@ -93,6 +96,21 @@ pub async fn search(
         w,
         p.offset.unwrap_or(0),
     ))?;
+    if let Some(spec) = p.sources.as_deref() {
+        if p.offset.unwrap_or(0) > 0 {
+            return Err(ApiError::bad("offset cannot be combined with sources"));
+        }
+        return super::workload::fan_out(
+            &s,
+            &id,
+            org,
+            spec,
+            q,
+            ("timestamp", w.limit as usize),
+            note,
+        )
+        .await;
+    }
     let (rows, mut meta) = s.run(q).await?;
     meta.note = note;
     Ok(ok(rows, meta))

@@ -130,9 +130,17 @@ const ADMIN_MUTATING: &[&str] = &[
     "/members",
     "/tokens",
     "/branding",
+    "/workgroups",
 ];
 /// Paths whose reads need an org admin (they show people, secrets or rules).
-const ADMIN_READING: &[&str] = &["/audit", "/members", "/tokens", "/redaction"];
+const ADMIN_READING: &[&str] = &[
+    "/audit",
+    "/members",
+    "/tokens",
+    "/redaction",
+    "/workgroups",
+    "/queries/stats",
+];
 
 /// The exhaustive route classification. Anything not named here is `Deny`.
 pub fn access_for(method: &Method, template: &str) -> Access {
@@ -413,6 +421,20 @@ pub async fn end_session(s: &Shared, cookie: &str) -> Result<(), ApiError> {
     if let Some(r) = store::get(s, PLATFORM_ORG, "session", &key).await? {
         store::remove(s, PLATFORM_ORG, "session", r, s.now_ms()).await?;
     }
+    Ok(())
+}
+
+/// End every session of `username` (after a password change or reset).
+pub async fn end_user_sessions(s: &Shared, username: &str) -> Result<(), ApiError> {
+    for r in store::list(s, PLATFORM_ORG, "session").await? {
+        let mine = serde_json::from_str::<SessionRec>(&r.spec)
+            .map(|rec| rec.user == username)
+            .unwrap_or(false);
+        if mine {
+            store::remove(s, PLATFORM_ORG, "session", r, s.now_ms()).await?;
+        }
+    }
+    s.auth.forget_all();
     Ok(())
 }
 

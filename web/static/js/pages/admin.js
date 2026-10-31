@@ -7,7 +7,7 @@ import { copyText, h, mount } from '../util/dom.js';
 import { fmtTime } from '../util/format.js';
 import { session, state } from '../state.js';
 
-const TABS = [['members', 'Members'], ['tokens', 'API tokens'], ['audit', 'Audit'], ['branding', 'Branding']];
+const TABS = [['members', 'Members'], ['tokens', 'API tokens'], ['queries', 'Queries'], ['groups', 'Work groups'], ['audit', 'Audit'], ['branding', 'Branding']];
 const ROLES = ['viewer', 'editor', 'admin'];
 const sel = (opts, v, label) => h('select', { 'aria-label': label }, opts.map((o) => h('option', { value: o, selected: o === v || null }, o)));
 
@@ -61,6 +61,34 @@ export async function adminPage(view, _p, tab = 'members') {
             await load(true);
           } catch (e) { say(e.message, 'warn'); }
         } }, 'Create token')));
+    },
+    async queries() {
+      const { data } = await api.get('queries');
+      const stats = await api.get('queries/stats').then((r) => r.data).catch(() => ({ slowest: [], most_frequent: [] }));
+      const cols = [{ key: 'user', label: 'Person' }, { key: 'tag', label: 'Query' }, { key: 'count', label: 'Runs', num: true }, { key: 'avg_ms', label: 'Avg ms', num: true }, { key: 'max_ms', label: 'Max ms', num: true }, { key: 'errors', label: 'Errors', num: true }];
+      mount(out,
+        h('div', { class: 'card stack' }, h('h3', null, 'Running now'),
+          dataTable({
+            columns: [{ key: 'user', label: 'Person' }, { key: 'tag', label: 'Query' }, { key: 'elapsed_ms', label: 'Running ms', num: true },
+              { key: 'greptime_id', label: 'GreptimeDB process', render: (r) => r.greptime_id || '–' },
+              { key: 'x', label: '', render: (r) => h('button', { type: 'button', class: 'ghost', onclick: () => confirm(`Cancel ${r.tag} by ${r.user}?`) && act(async () => { const c = await api.send('POST', `queries/${r.id}/cancel`); say(c.data.killed ? 'Cancelled and stopped in GreptimeDB.' : 'Cancelled.', 'ok'); }) }, 'Cancel') }],
+            rows: data.running, empty: 'Nothing is running.',
+          }),
+          h('button', { type: 'button', onclick: () => load(true) }, 'Refresh')),
+        h('div', { class: 'card stack' }, h('h3', null, 'Slowest (since start)'), dataTable({ columns: cols, rows: stats.slowest, empty: 'No queries yet.' })),
+        h('div', { class: 'card stack' }, h('h3', null, 'Most frequent (since start)'), dataTable({ columns: cols, rows: stats.most_frequent, empty: 'No queries yet.' })));
+    },
+    async groups() {
+      const { data } = await api.get('workgroups');
+      const num = (v) => h('input', { type: 'number', min: '0', value: String(v), style: 'width:110px' });
+      mount(out, h('p', { class: 'muted' }, 'Limits per role, checked before a query runs. 0 means no limit. The error a person sees names the limit that stopped them.'),
+        data.map((g) => {
+          const f = { max_concurrent: num(g.limits.max_concurrent), timeout_secs: num(g.limits.timeout_secs), max_rows: num(g.limits.max_rows), max_window_hours: num(g.limits.max_window_hours) };
+          const field = (k, l) => h('label', { class: 'field' }, h('span', null, l), f[k]);
+          return h('div', { class: 'card row' }, h('strong', null, g.role),
+            field('max_concurrent', 'Running at once'), field('timeout_secs', 'Timeout (s)'), field('max_rows', 'Max rows'), field('max_window_hours', 'Max window (h)'),
+            h('button', { class: 'primary', type: 'button', onclick: () => act(async () => { await api.send('PUT', `workgroups/${g.role}`, Object.fromEntries(Object.entries(f).map(([k, el]) => [k, Number(el.value) || 0]))); say(`Saved limits for ${g.role}.`, 'ok'); }) }, 'Save'));
+        }));
     },
     async audit() {
       const user = h('input', { placeholder: 'user', 'aria-label': 'User', style: 'width:140px' });

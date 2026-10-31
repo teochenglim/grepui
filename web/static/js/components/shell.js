@@ -28,7 +28,8 @@ const LIVE = [
   ['connect', 'Connect'],
 ];
 const SOON = [
-  ['Access control', 'v0.11'],
+  ['Reports', 'v0.13'],
+  ['RUM', 'v0.13'],
 ];
 
 /** Who is signed in, with sign-out (R-C1). With --no-auth there is nobody to sign out. */

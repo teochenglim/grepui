@@ -96,6 +96,10 @@ pub struct Config {
     /// `value=role@org` (viewer, editor, admin) or `value=platform_admin`; repeat or separate with `;`.
     #[arg(long, env = "GREPUI_OIDC_ROLE_MAP", value_delimiter = ';')]
     pub oidc_role_map: Vec<String>,
+    /// Extra GreptimeDB sources as `name=mysql://...` (v0.12.0); repeat or separate with `;`.
+    /// The org databases are expected to exist on each one.
+    #[arg(long = "source", env = "GREPUI_SOURCES", value_delimiter = ';')]
+    pub sources: Vec<String>,
     /// Per-query timeout in seconds.
     #[arg(long, env = "GREPUI_QUERY_TIMEOUT_SECS", default_value_t = 30)]
     pub query_timeout_secs: u64,
@@ -126,6 +130,7 @@ impl Default for Config {
             oidc_scopes: "openid profile email".into(),
             oidc_role_claim: "groups".into(),
             oidc_role_map: vec![],
+            sources: vec![],
             pipeline_http: None,
             smtp: None,
             smtp_from: "grepui@localhost.localdomain".into(),
@@ -203,6 +208,14 @@ impl Config {
         if let Some(a) = &self.smtp {
             crate::alerts::notify::Smtp::parse(a, &self.smtp_from)
                 .map_err(|e| anyhow::anyhow!("--smtp: {e}"))?;
+        }
+        let mut seen = std::collections::HashSet::new();
+        for r in &self.sources {
+            let (n, _) =
+                crate::workload::parse_source(r).map_err(|e| anyhow::anyhow!("--source: {e}"))?;
+            if !seen.insert(n) {
+                anyhow::bail!("--source: a name is used twice");
+            }
         }
         if self.query_timeout_secs == 0 || self.query_timeout_secs > 600 {
             anyhow::bail!("--query-timeout-secs must be between 1 and 600");

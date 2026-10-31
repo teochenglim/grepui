@@ -438,6 +438,9 @@ pub const ITEM_KINDS: &[&str] = &[
     "oidc",
     "token",
     "setup",
+    // v0.12.0: work groups (per org, keyed by role) and source settings (platform rows).
+    "workgroup",
+    "source",
 ];
 
 fn item_kind(kind: &str) -> Result<Bind> {

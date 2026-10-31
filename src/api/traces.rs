@@ -36,6 +36,8 @@ pub struct TraceParams {
     errors: Option<bool>,
     min_ms: Option<i64>,
     span: Option<String>,
+    /// `all` or `a,b`: read from these sources and merge by time (v0.12.0).
+    sources: Option<String>,
 }
 
 /// Columns of the traces table (including the flat attribute columns), cached briefly.
@@ -101,6 +103,7 @@ fn bad_table<T>(r: anyhow::Result<T>) -> Result<T, ApiError> {
 
 pub async fn list(
     State(s): State<Shared>,
+    axum::Extension(id): axum::Extension<crate::auth::Identity>,
     Path(org): Path<String>,
     Query(p): Query<TraceParams>,
 ) -> Result<Response, ApiError> {
@@ -114,6 +117,21 @@ pub async fn list(
         w,
         p.offset.unwrap_or(0),
     ))?;
+    if let Some(spec) = p.sources.as_deref() {
+        if p.offset.unwrap_or(0) > 0 {
+            return Err(ApiError::bad("offset cannot be combined with sources"));
+        }
+        return super::workload::fan_out(
+            &s,
+            &id,
+            org,
+            spec,
+            q,
+            ("start_ms", w.limit as usize),
+            None,
+        )
+        .await;
+    }
     let (rows, meta) = s.run(q).await?;
     Ok(ok(rows, meta))
 }

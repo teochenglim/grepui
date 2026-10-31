@@ -32,6 +32,9 @@ pub enum ReadError {
     Timeout,
     #[error("database error")]
     Db(String),
+    /// A work group limit stopped the query; the text names the limit (v0.12.0).
+    #[error("work group limit")]
+    Quota(String),
 }
 
 impl ReadError {
@@ -39,7 +42,7 @@ impl ReadError {
     pub fn detail(&self) -> String {
         match self {
             ReadError::Timeout => "the query timed out".into(),
-            ReadError::Db(d) => d.clone(),
+            ReadError::Db(d) | ReadError::Quota(d) => d.clone(),
         }
     }
 }
@@ -51,6 +54,7 @@ impl From<ReadError> for ApiError {
                 StatusCode::GATEWAY_TIMEOUT,
                 "the query took too long and was cancelled".into(),
             ),
+            ReadError::Quota(m) => ApiError(StatusCode::TOO_MANY_REQUESTS, m),
             ReadError::Db(detail) => {
                 // Logged for the operator; the client gets a generic message (no URLs, no SQL).
                 tracing::error!(detail = %detail, "database error");

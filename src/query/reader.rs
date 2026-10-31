@@ -115,6 +115,28 @@ impl Reader for SqlxReader {
             .map_err(|_| ReadError::Timeout)?
     }
 
+    async fn kill(&self, id: &str) -> Result<(), ReadError> {
+        // `KILL` cannot be prepared. The id comes from GreptimeDB's own process list, and only
+        // its characters (digits, `.`, `:`, `/`) are let through.
+        if id.is_empty()
+            || id.len() > 64
+            || !id
+                .bytes()
+                .all(|b| b.is_ascii_digit() || matches!(b, b'.' | b':' | b'/'))
+        {
+            return Err(ReadError::Db("not a process id".into()));
+        }
+        let sql = format!("KILL '{id}'");
+        tokio::time::timeout(
+            self.timeout,
+            sqlx::raw_sql(sqlx::AssertSqlSafe(sql)).execute(&self.pool),
+        )
+        .await
+        .map_err(|_| ReadError::Timeout)?
+        .map_err(|e| ReadError::Db(e.to_string()))?;
+        Ok(())
+    }
+
     async fn fetch(&self, q: &Q) -> Result<Vec<Value>, ReadError> {
         let rows = tokio::time::timeout(self.timeout, bind_all(q).fetch_all(&self.pool))
             .await

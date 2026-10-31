@@ -139,10 +139,10 @@ Status: `planned` (requirement ID and release; a row whose release is `ready` or
 | Service accounts, tokens | read (IAM list) | | built R-C3, 0.11 | |
 | Ingestion tokens | read (IAM list) | | n/a | Ingest goes to GreptimeDB, not grepui |
 | Audit trail | read | ent | built R-C5, 0.11 | |
-| Query management | read | ent | planned R-W1, 0.12 | Process list and cancel |
-| Workload management / work groups | read | ent | planned R-W2, R-W3, 0.12 | Quotas per role |
-| Quotas | read (IAM list) | | planned R-W2, 0.12 | |
-| Federated search / super cluster | read | ent | planned R-Y1, R-Y2, 0.12 | Fan-out over configured GreptimeDB sources |
+| Query management | read | ent | built R-W1, 0.12 | Process list and cancel |
+| Workload management / work groups | read | ent | built R-W2, R-W3, 0.12 | Quotas per org and role; statistics per process |
+| Quotas | read (IAM list) | | built R-W2, 0.12 | |
+| Federated search / super cluster | read | ent | built R-Y1, R-Y2, 0.12 | Fan-out over `--source` servers for logs search and the trace list |
 | Cipher keys | read | ent | gap | Redaction only (R-N4) |
 | AI credits, cloud usage, AutoObserve, Kubernetes explorer, synthetics, incidents RCA | nav | | gap | Cloud or AI features; out of scope |
 

@@ -2,7 +2,7 @@
 
 The single place to see where grepui stands: what is shipped, what is planned, what each release proves, and how a release is cut. Per-release detail (scope, acceptance criteria, named tests, checklist) lives in [`RELEASE/vX.Y.Z.md`](RELEASE/README.md); this file is the readable roll-up and the changelog.
 
-> **Current state:** v0.1.0 to v0.11.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.12.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
+> **Current state:** v0.1.0 to v0.12.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.12.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
 
 ## 1. Summary
 
@@ -21,13 +21,13 @@ grepui is a multi-tenant observability UI for GreptimeDB: one Rust binary (axum)
 
 ## 2. Release status
 
-Latest built: **v0.11.0: Access control, multi-tenancy, SSO and audit** (ready). Newest first.
+Latest built: **v0.12.0: Query management, work groups and federation** (ready). Newest first.
 
 | Release | Theme | Status | ACs | Requirements covered |
 |---|---|---|---|---|
 | [v1.0.0](RELEASE/v1.0.0.md) | Launch hardening | planned | 2 | R-C2 R-F4 R-Q1 |
 | [v0.13.0](RELEASE/v0.13.0.md) | Reports, RUM view and operate | planned | 5 | R-E1 R-O1 R-O2 R-O3 R-U1 |
-| [v0.12.0](RELEASE/v0.12.0.md) | Query management, work groups and federation | planned | 5 | R-W1 R-W2 R-W3 R-Y1 R-Y2 |
+| [v0.12.0](RELEASE/v0.12.0.md) | Query management, work groups and federation | ready | 5 | R-W1 R-W2 R-W3 R-Y1 R-Y2 |
 | [v0.11.0](RELEASE/v0.11.0.md) | Access control, multi-tenancy, SSO and audit | ready | 7 | R-C1 R-C2 R-C3 R-C4 R-C5 R-C6 |
 | [v0.10.0](RELEASE/v0.10.0.md) | Pipelines, functions, enrichment, redaction | ready | 4 | R-F4 R-N1 R-N2 R-N3 R-N4 |
 | [v0.9.0](RELEASE/v0.9.0.md) | Alerts and incidents | ready | 8 | R-A1 R-A2 R-A3 R-A4 R-A5 R-A6 R-A7 R-A8 |
@@ -60,6 +60,12 @@ Newest first. An entry is written when a release becomes `ready`; the same text 
 ### Unreleased
 
 - Requirements, architecture, positioning and parity matrix (ARCH 00–07), release plan with ACs for v0.1.0–v1.0.0, `scripts/seed.py` (demo traces and logs over OTLP/protobuf, `--db` per org).
+
+### v0.12.0: Query management, work groups and federation (ready)
+
+Added: running queries with the GreptimeDB process each matches, cancel (own queries for editors, any for admins; the request stops at once and the database is asked to `KILL` the process); work groups per org and role (running at once, timeout, rows, window) enforced before or while a query runs, with errors that name the limit; query statistics (slowest and most frequent per user and tag); extra GreptimeDB sources (`--source name=mysql://...`) with `sources=all|a,b` on logs search and the trace list, merged by time, per-source outcome reported, per-source minimum role and an on/off switch without a restart (ADR 0013). UI: Queries and Work groups tabs under Administration, Sources under Platform, a source picker on Logs. Also: a password change or reset now ends the user's other sessions (security review finding on v0.11.0).
+
+No schema change (two new kinds in `grepui_alert_items`: `workgroup`, `source`). New flag `--source`; no new dependencies. Limits: statistics are per process and reset on restart; process attribution is by statement text; quotas are per org and role (no per-user or per-stream); federation covers logs search and the trace list only; source credentials are flags.
 
 ### v0.11.0: Access control, multi-tenancy, SSO and audit (ready)
 
@@ -141,10 +147,6 @@ Will add: Scheduled reports (HTML/CSV by email); RUM view over GrepRUM tables; R
 
 Session replay and PDF reports are not supported; ARCH 07 lists them as gaps.
 
-### v0.12.0: Query management, work groups and federation (planned)
-
-Will add: Running queries and cancel; Work groups and quotas per role; Query statistics; Several GreptimeDB sources with fan-out and merge.
-
 ### v0.11.0: Access control, multi-tenancy, SSO and audit (planned)
 
 Will add: Local users, organizations (tenants), roles, sessions; multi-tenant UI with org switcher, branding and org admins; RBAC enforced in the query layer for every endpoint; API tokens and service accounts; OpenID Connect SSO; Audit trail with search.
@@ -181,6 +183,7 @@ Honest ledger of what has actually been run. Updated as releases land.
 | OpenInference spans on trace v2 (JSON2) | spike on v1.3.0: stored with 19 fixed columns (300 indexed messages and a 200 KB prompt in one span), queried with `json_get_*(col, '["key"]')`; grepui's trace list/waterfall/logs work on a v2 table, its span panel and attribute filters do not yet (roadmap LLM track L1) |
 | CI-parity run (fresh `make db-down db-up`, seed, `make test-db`) | green for every live test after the v0.4.0 fixes; it reproduced the v0.3.0 CI failure and found the join bug below |
 | **GreptimeDB v1.2.1: `IN (subquery)`, `EXISTS` and self-joins on a telemetry table return wrong, nondeterministic rows** | verified live (4 / 6 / 5 / 0 for a true 33); no such query is used (ADR 0007); the v0.5.0 dependency self-join is verified correct on v1.3.0 (`ac_0_5_3_dependencies_live`) |
+| Query management and federation (v0.12.0): work-group quotas, running list and cancel, statistics, fan-out merge, source RBAC and disable | verified live (a cross join of a seeded log table shows in `information_schema.process_list` and matches grepui's statement text; a real `KILL` removes the process and ends the read; grepui-side cancel is prompt; a twin source over the same data returns exactly twice the rows, newest first); browser pass on Queries, Work groups, Sources and the Logs source picker. Not exercised: two genuinely separate clusters, more than one replica sharing a source switch |
 | Access control (v0.11.0): sessions, deny by default over every route, isolation matrix across two orgs, tokens, audit, org create/delete cascade | verified live (first admin once, cross-org blocking, a real `CREATE DATABASE`, the cascade, audit search) and in a browser (sign-in, administration, tokens, audit, platform orgs); OIDC verified against a local stand-in provider with generated keys, not a real one; the TLS client verified against example.com and a wrong-host certificate; the SSO redirect in a browser not exercised |
 | Pipelines, functions, enrichment, redaction (v0.10.0) | pipeline create/version/dry-run/delete verified live against GreptimeDB v1.3.0 (`ac_0_10_1_pipeline_live`); enrichment upload and the join helper verified live with exact per-tier counts (`ac_0_10_3_enrichment_join_live`); bound function arguments verified live; redaction verified on a live response; pipelines also tested against a local stand-in for the HTTP API; the role model is a stand-in (admin = `--admin-writes`) |
 | Alerts: rule evaluation, dedup, cooldown, downtimes, incidents, history, lease between two replicas, webhook delivery, SMTP (v0.9.0) | verified live (exact counts per service and builder count against the generator, lease handover on v1.3.0, the demo rule fires, dedups and opens an incident) and in a browser; webhook and SMTP are tested against local fake servers only, never a real mail relay or an https endpoint; the lease is not compare-and-set |

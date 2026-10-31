@@ -822,6 +822,9 @@ pub async fn platform_user_update(
         u.platform_admin = a;
     }
     auth::user_put(&s, &u, created_ms).await?;
+    if b.password.is_some() {
+        auth::end_user_sessions(&s, &u.username).await?;
+    }
     audit::event(
         &s,
         PLATFORM_ORG,

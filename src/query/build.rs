@@ -10,6 +10,16 @@ pub fn health() -> Q {
     Q::new("health", "SELECT 1 AS ok", vec![])
 }
 
+/// GreptimeDB's own list of running statements (v0.12.0).
+pub fn process_list() -> Q {
+    Q::new(
+        "process_list",
+        "SELECT id, schemas AS db, query, CAST(start_timestamp AS BIGINT) AS start_ms, \
+         CAST(elapsed_time AS BIGINT) AS elapsed_ms FROM information_schema.process_list",
+        vec![],
+    )
+}
+
 /// Tables of one database with GreptimeDB's own row estimate and creation options.
 pub fn streams_list(db: &str) -> Q {
     Q::new(

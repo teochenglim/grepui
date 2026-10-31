@@ -91,6 +91,11 @@ pub trait Reader: Send + Sync {
         rows.truncate(max);
         Ok(rows)
     }
+
+    /// Ask the database to stop the process with this id (v0.12.0). Not every reader can.
+    async fn kill(&self, _id: &str) -> Result<(), ReadError> {
+        Err(ReadError::Db("this reader cannot cancel queries".into()))
+    }
 }
 
 /// Writes. Only `crate::store` builds the statements and only [`crate::store::check_write`]

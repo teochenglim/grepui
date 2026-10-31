@@ -63,6 +63,13 @@ pub async fn serve(cfg: Config) -> Result<()> {
         tracing::warn!(error = %e.1, "could not load orgs yet");
     }
     api::access::spawn_org_refresh(app.clone());
+    for spec in &app.cfg.sources {
+        let (name, url) = crate::workload::parse_source(spec).map_err(anyhow::Error::msg)?;
+        let r = SqlxReader::lazy(&url, Duration::from_secs(app.cfg.query_timeout_secs))?;
+        app.add_source(&name, Arc::new(r));
+        tracing::info!(source = %name, "extra source added");
+    }
+    api::workload::spawn_refresh(app.clone());
     if app.cfg.no_auth {
         tracing::warn!(
             "sign-in is switched off (--no-auth): everyone is an admin and nothing is audited"

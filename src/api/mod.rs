@@ -20,6 +20,7 @@ pub mod storage;
 pub mod streams;
 pub mod traces;
 pub mod views;
+pub mod workload;
 
 use crate::{
     config::Config,
@@ -61,6 +62,10 @@ pub struct AppState {
     pub auth: crate::auth::AuthState,
     /// Audit rows waiting to be written.
     pub audit: crate::audit::Audit,
+    /// Work groups, running queries and statistics (ADR 0013).
+    pub workload: Arc<crate::workload::Workload>,
+    /// Extra GreptimeDB sources for fan-out reads.
+    pub sources: crate::workload::Sources,
 }
 
 pub type Shared = Arc<AppState>;
@@ -120,6 +125,12 @@ impl AppState {
     ) -> anyhow::Result<Shared> {
         cfg.validate()?;
         let orgs = Orgs::from_config(&cfg)?;
+        let workload = Arc::new(crate::workload::Workload::default());
+        let reader: Arc<dyn Reader> = Arc::new(crate::workload::Governed::new(
+            reader,
+            workload.clone(),
+            clock.clone(),
+        ));
         Ok(Arc::new(AppState {
             cfg: Arc::new(cfg),
             orgs,
@@ -133,6 +144,8 @@ impl AppState {
             redact_ready: std::sync::atomic::AtomicBool::new(true),
             auth: Default::default(),
             audit: Default::default(),
+            workload,
+            sources: Default::default(),
         }))
     }
 
@@ -285,6 +298,18 @@ impl AppState {
             })
     }
 
+    /// Register an extra source; its reads are held to the same work groups as the primary's.
+    pub fn add_source(&self, name: &str, reader: Arc<dyn Reader>) {
+        self.sources.add(
+            name,
+            Arc::new(crate::workload::Governed::new(
+                reader,
+                self.workload.clone(),
+                self.clock.clone(),
+            )),
+        );
+    }
+
     pub fn org(&self, name: &str) -> Result<&Org, ApiError> {
         self.orgs.resolve(name)
     }
@@ -326,6 +351,8 @@ pub const ROUTES: &[&str] = &[
     "/api/v1/auth/password",
     "/api/v1/auth/oidc/login",
     "/api/v1/auth/oidc/callback",
+    "/api/v1/platform/sources",
+    "/api/v1/platform/sources/{name}",
     "/api/v1/platform/orgs",
     "/api/v1/platform/orgs/{org}",
     "/api/v1/platform/users",
@@ -415,6 +442,12 @@ pub const ROUTES: &[&str] = &[
     "/api/v1/orgs/{org}/enrichment/{name}/join",
     "/api/v1/orgs/{org}/redaction",
     "/api/v1/orgs/{org}/redaction/{id}",
+    "/api/v1/orgs/{org}/workgroups",
+    "/api/v1/orgs/{org}/workgroups/{role}",
+    "/api/v1/orgs/{org}/queries",
+    "/api/v1/orgs/{org}/queries/stats",
+    "/api/v1/orgs/{org}/queries/{id}/cancel",
+    "/api/v1/orgs/{org}/sources",
     "/api/v1/orgs/{org}/metrics",
     "/api/v1/orgs/{org}/metrics/query",
     "/api/v1/orgs/{org}/metrics/{name}/labels",
@@ -494,6 +527,10 @@ pub const WRITE_ROUTES: &[(&str, &str)] = &[
     ("POST", "/api/v1/orgs/{org}/redaction"),
     ("PUT", "/api/v1/orgs/{org}/redaction/{id}"),
     ("DELETE", "/api/v1/orgs/{org}/redaction/{id}"),
+    ("PUT", "/api/v1/orgs/{org}/workgroups/{role}"),
+    ("DELETE", "/api/v1/orgs/{org}/workgroups/{role}"),
+    ("POST", "/api/v1/orgs/{org}/queries/{id}/cancel"),
+    ("PUT", "/api/v1/platform/sources/{name}"),
     ("PUT", "/api/v1/orgs/{org}/services/{service}/annotation"),
     ("DELETE", "/api/v1/orgs/{org}/services/{service}/annotation"),
 ];
@@ -798,6 +835,26 @@ pub fn router(state: Shared) -> Router {
         .route(
             "/api/v1/orgs/{org}/redaction/{id}",
             axum::routing::put(redaction::update).delete(redaction::delete),
+        )
+        .route("/api/v1/orgs/{org}/workgroups", get(workload::groups_list))
+        .route(
+            "/api/v1/orgs/{org}/workgroups/{role}",
+            axum::routing::put(workload::group_put).delete(workload::group_delete),
+        )
+        .route("/api/v1/orgs/{org}/queries", get(workload::queries_list))
+        .route(
+            "/api/v1/orgs/{org}/queries/stats",
+            get(workload::queries_stats),
+        )
+        .route(
+            "/api/v1/orgs/{org}/queries/{id}/cancel",
+            axum::routing::post(workload::query_cancel),
+        )
+        .route("/api/v1/orgs/{org}/sources", get(workload::sources_org))
+        .route("/api/v1/platform/sources", get(workload::sources_platform))
+        .route(
+            "/api/v1/platform/sources/{name}",
+            axum::routing::put(workload::source_put),
         )
         .route("/api/v1/orgs/{org}/metrics", get(metrics::names))
         .route("/api/v1/orgs/{org}/metrics/query", get(metrics::query))

@@ -241,6 +241,17 @@ async fn ac_0_11_1_password_hashed() {
         )
         .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    // A password change ends every older session and hands back a fresh one.
+    assert_eq!(
+        w.get("/api/v1/orgs/default/views", &root).await.status,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        w.get("/api/v1/orgs/default/views", &r.cookie())
+            .await
+            .status,
+        StatusCode::OK
+    );
     assert_eq!(
         w.post(
             "/api/v1/auth/login",

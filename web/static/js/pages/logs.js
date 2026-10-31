@@ -28,13 +28,23 @@ export async function logsPage(view) {
     }
     return;
   }
-  const st = { q: qp.get('q') || '', level: qp.get('level') || '', mode: qp.get('mode') === 'sql' ? 'sql' : 'search', sql: qp.get('sql') || '' };
+  const st = { sources: qp.get('sources') || '', q: qp.get('q') || '', level: qp.get('level') || '', mode: qp.get('mode') === 'sql' ? 'sql' : 'search', sql: qp.get('sql') || '' };
   const w = () => ({ ...timeWindow() });
   const params = () => {
     const { from, to } = w();
     return { from, to, q: st.q || null, level: st.level || null };
   };
 
+  // The sources a search can read from (v0.12.0); the picker shows only when there is a choice.
+  let sources = [];
+  const searchParams = () => ({ ...params(), sources: st.sources || null });
+  const sourceNote = h('span', { class: 'row' });
+  const picker = h('select', { 'aria-label': 'Source', onchange: () => { st.sources = picker.value; sync(); load(); } });
+  const paintPicker = () => {
+    mount(picker, [['', 'Primary source'], ['all', 'All sources'], ...sources.filter((s) => s !== 'primary').map((s) => [s, s])].map(([v, l]) => h('option', { value: v, selected: v === st.sources || null }, l)));
+    picker.hidden = sources.length < 2;
+  };
+  api.get('sources').then(({ data }) => { sources = data.map((s) => s.name); paintPicker(); }).catch(() => {});
   const getSpec = () => ({ q: st.q, level: st.level, range: state.range, mode: st.mode, sql: st.mode === 'sql' ? st.sql : '' });
   const views = viewsBar({ kind: 'logs', getSpec });
   const bar = filterBar({ q: st.q, level: st.level, onSubmit: (v) => { Object.assign(st, v); sync(); load(); recordSearch('logs', getSpec()); } });
@@ -47,10 +57,10 @@ export async function logsPage(view) {
   let offset = 0;
   let epoch = 0;
 
-  const sync = () => replaceQuery({ q: st.q, level: st.level, mode: st.mode === 'sql' ? 'sql' : null, sql: st.mode === 'sql' ? st.sql : null });
+  const sync = () => replaceQuery({ q: st.q, level: st.level, sources: st.sources || null, mode: st.mode === 'sql' ? 'sql' : null, sql: st.mode === 'sql' ? st.sql : null });
 
   function paintRows(note) {
-    mount(results, logTable(rows), rows.length && rows.length % PAGE === 0 ? h('div', { class: 'row center' }, more) : null);
+    mount(results, logTable(rows), rows.length && rows.length % PAGE === 0 && !st.sources ? h('div', { class: 'row center' }, more) : null);
     mount(summary, `${fmtNum(rows.length)} shown`, note ? h('span', { class: 'badge warn', title: note }, 'LIKE fallback') : null);
   }
 
@@ -60,11 +70,13 @@ export async function logsPage(view) {
     mount(results, stateBox('Searching…'));
     mount(histBox, stateBox('Counting…'));
     const p = params();
-    const [search, hist] = await Promise.allSettled([api.get('logs', { ...p, limit: PAGE, offset: 0 }), api.get('logs/histogram', p)]);
+    const [search, hist] = await Promise.allSettled([api.get('logs', { ...searchParams(), limit: PAGE, offset: 0 }), api.get('logs/histogram', p)]);
     if (mine !== epoch) return; // a newer search started
     if (search.status === 'fulfilled') {
       rows = search.value.data;
       paintRows(search.value.meta.note);
+      // A source that failed is named; the others still answered.
+      mount(sourceNote, (search.value.sources || []).filter((s) => !s.ok).map((s) => h('span', { class: 'badge warn', title: s.error }, `${s.name}: ${s.error}`)));
     } else {
       mount(results, stateBox(search.reason.message, 'error'));
     }
@@ -105,7 +117,7 @@ export async function logsPage(view) {
       return;
     }
     mount(view,
-      h('div', { class: 'page-head' }, h('h2', null, 'Logs'), h('div', { class: 'seg' }, modeBtn('search', 'Search'), modeBtn('sql', 'SQL')), h('span', { class: 'grow' }), views, summary, h('span', { class: 'muted' }, 'Export'), exportLink('csv'), exportLink('ndjson')),
+      h('div', { class: 'page-head' }, h('h2', null, 'Logs'), h('div', { class: 'seg' }, modeBtn('search', 'Search'), modeBtn('sql', 'SQL')), h('span', { class: 'grow' }), picker, sourceNote, views, summary, h('span', { class: 'muted' }, 'Export'), exportLink('csv'), exportLink('ndjson')),
       bar.el, histBox,
       h('div', { class: 'split' }, fieldBox, h('div', { class: 'grow' }, results)));
     load();

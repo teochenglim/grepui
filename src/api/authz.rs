@@ -7,6 +7,7 @@ use crate::{
     audit,
     auth::{self, Access, Identity},
     store::build::{AuditRow, PLATFORM_ORG},
+    workload::{CTX, Ctx},
 };
 use axum::{
     Json,
@@ -86,6 +87,12 @@ fn audited(template: &str, method: &Method) -> bool {
         return false;
     }
     *method != Method::OPTIONS && *method != Method::HEAD
+}
+
+fn opt_param(q: Option<&str>, key: &str) -> Option<i64> {
+    q?.split('&')
+        .find_map(|p| p.strip_prefix(&format!("{key}=")))
+        .and_then(|v| v.parse().ok())
 }
 
 fn params(q: Option<&str>, key: &str) -> i64 {
@@ -175,8 +182,28 @@ pub async fn layer(
     if access == Access::Anonymous && identity.is_anonymous() {
         identity.username = "anonymous".into();
     }
+    // Work groups (ADR 0013): the window is checked before anything runs, and the rest of the
+    // limits ride on the task so every read made for this request is held to them.
+    let ctx = org.as_ref().map(|o| Ctx {
+        user: identity.username.clone(),
+        org: o.clone(),
+        role: identity.role_in(o).unwrap_or(auth::Role::Viewer),
+    });
+    if let Some(c) = &ctx
+        && (method == Method::GET || method == Method::HEAD)
+        && let (Some(from), Some(to)) = (
+            opt_param(query.as_deref(), "from"),
+            opt_param(query.as_deref(), "to"),
+        )
+        && let Err(m) = s.workload.check_window(&c.org, c.role, from, to)
+    {
+        return deny(StatusCode::TOO_MANY_REQUESTS, &m);
+    }
     req.extensions_mut().insert(identity.clone());
-    let res = next.run(req).await;
+    let res = match ctx {
+        Some(c) => CTX.scope(c, next.run(req)).await,
+        None => next.run(req).await,
+    };
     if !s.cfg.no_auth && audited(&template, &method) {
         let rows = res
             .headers()

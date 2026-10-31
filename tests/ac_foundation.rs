@@ -262,6 +262,7 @@ fn fill(route: &str) -> String {
         .replace("{stream}", "traces")
         .replace("{id}", "0123456789abcdef")
         .replace("{user}", "alice")
+        .replace("{role}", "viewer")
         .replace("{trace_id}", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 }
 
@@ -320,6 +321,9 @@ async fn ac_0_1_4_every_listed_route_exists() {
             || route.ends_with("/platform/orgs/{org}")
             || route.ends_with("/platform/users/{user}")
             || route.ends_with("/members/{user}")
+            || route.ends_with("/workgroups/{role}")
+            || route.ends_with("/platform/sources/{name}")
+            || route.ends_with("/cancel")
             || route.ends_with("/tokens/{id}");
         if !write_only {
             assert_ne!(r.status, StatusCode::METHOD_NOT_ALLOWED, "{route}");

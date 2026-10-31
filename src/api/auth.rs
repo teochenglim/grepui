@@ -277,8 +277,15 @@ pub async fn change_password(
     u.password_hash =
         password::hash(&b.new).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e))?;
     auth::user_put(&s, &u, created).await?;
+    auth::end_user_sessions(&s, &u.username).await?;
     audit::event(&s, PLATFORM_ORG, &u.username, "auth.password", "ok", "").await;
-    Ok(ok(json!({"changed": true}), meta("auth_password")))
+    // every session is gone, including this one: hand back a fresh cookie
+    let cookie = auth::create_session(&s, &u.username).await?;
+    Ok(with_cookie(
+        ok(json!({"changed": true}), meta("auth_password")),
+        &cookie,
+        s.cfg.session_hours,
+    ))
 }
 
 // ---- OpenID Connect ------------------------------------------------------------------------------

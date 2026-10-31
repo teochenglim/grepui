@@ -217,6 +217,7 @@ fn rows_to_raw(rows: &[Value]) -> Result<Vec<Raw>, String> {
 fn db_error(e: ReadError) -> String {
     match e {
         ReadError::Timeout => "the query took too long".into(),
+        ReadError::Quota(m) => m,
         ReadError::Db(d) => {
             tracing::warn!(detail = %d, "alert query failed");
             "the database could not run the query".into()

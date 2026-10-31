@@ -5,7 +5,7 @@ import { dataTable, stateBox } from '../components/table.js';
 import { h, mount } from '../util/dom.js';
 import { fmtTime } from '../util/format.js';
 
-const TABS = [['orgs', 'Orgs'], ['users', 'Users'], ['audit', 'Audit']];
+const TABS = [['orgs', 'Orgs'], ['users', 'Users'], ['sources', 'Sources'], ['audit', 'Audit']];
 const root = (path, opts) => fetch(`/api/v1/platform/${path}`, { ...opts, headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }).then(async (r) => {
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
@@ -50,6 +50,18 @@ export async function platformPage(view, _p, tab = 'orgs') {
         }),
         h('div', { class: 'card row' }, f.name, f.pw, h('label', { class: 'row' }, f.admin, 'platform admin'),
           h('button', { class: 'primary', type: 'button', onclick: () => act(async () => { await root('users', { method: 'POST', body: JSON.stringify({ username: f.name.value, password: f.pw.value, platform_admin: f.admin.checked }) }); say('User created. Add them to an org under Administration → Members.', 'ok'); }) }, 'Create user')));
+    },
+    async sources() {
+      const { data } = await root('sources');
+      const ROLES = ['viewer', 'editor', 'admin'];
+      mount(out, h('p', { class: 'muted' }, 'GreptimeDB servers a search can read from, besides the primary. Add more with --source name=mysql://… . Turning one off takes effect at once.'),
+        dataTable({
+          columns: [{ key: 'name', label: 'Source' },
+            { key: 'health', label: 'Health', render: (s) => h('span', { class: `badge ${s.health.ok ? 'ok' : 'bad'}`, title: s.health.error || '' }, s.health.ok ? `ok · ${s.health.ms} ms` : s.health.error) },
+            { key: 'min_role', label: 'Lowest role', render: (s) => { if (s.name === 'primary') return 'viewer'; const e = h('select', { 'aria-label': `Lowest role for ${s.name}` }, ROLES.map((r) => h('option', { value: r, selected: r === s.min_role || null }, r))); e.onchange = () => act(() => root(`sources/${s.name}`, { method: 'PUT', body: JSON.stringify({ min_role: e.value }) })); return e; } },
+            { key: 'enabled', label: 'State', render: (s) => (s.name === 'primary' ? h('span', { class: 'muted' }, 'always on') : h('button', { type: 'button', class: 'ghost', onclick: () => act(() => root(`sources/${s.name}`, { method: 'PUT', body: JSON.stringify({ enabled: !s.enabled }) })) }, s.enabled ? 'Disable' : 'Enable')) }],
+          rows: data, empty: 'No sources.',
+        }));
     },
     async audit() {
       const { data } = await root('audit?limit=200');

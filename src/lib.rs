@@ -23,6 +23,7 @@ pub mod redact;
 pub mod server;
 pub mod store;
 pub mod ui;
+pub mod workload;
 
 /// Build version, stamped by `GREPUI_VERSION` at compile time.
 pub const VERSION: &str = match option_env!("GREPUI_VERSION") {
