@@ -229,7 +229,7 @@ fn dash_json(d: &DashRow) -> Value {
     })
 }
 
-async fn load(s: &Shared, org: &Org, id: &str, kind: &str) -> Result<DashRow, ApiError> {
+pub(crate) async fn load(s: &Shared, org: &Org, id: &str, kind: &str) -> Result<DashRow, ApiError> {
     let (rows, _) = s
         .read_store(build::dash_get(s.meta_db(), &org.name, &hex_id(id, kind)?).map_err(invalid)?)
         .await?;
@@ -385,10 +385,19 @@ pub async fn dash_delete(
 
 // ---- panel data and variables -------------------------------------------------------------
 
-struct DataQuery {
+pub(crate) struct DataQuery {
     window: Window,
     compare: Option<String>,
     selected: Selected,
+}
+
+/// The defaults (no variable chosen) over `window`: how a report reads a dashboard.
+pub(crate) fn query_for(window: Window) -> Result<DataQuery, ApiError> {
+    Ok(DataQuery {
+        window,
+        compare: None,
+        selected: vars::selected_from_query("")?,
+    })
 }
 
 fn data_query(raw: Option<&str>, now_ms: i64) -> Result<DataQuery, ApiError> {
@@ -474,7 +483,7 @@ async fn run_query(
     }
 }
 
-async fn panel_data(
+pub(crate) async fn panel_data(
     s: &Shared,
     org: &Org,
     spec: &Value,

@@ -35,7 +35,7 @@ pub struct LogParams {
 }
 
 /// Does `body` have a fulltext index? Asked of the database, cached briefly per org.
-async fn ft_mode(s: &Shared, org: &Org) -> FtMode {
+pub(crate) async fn ft_mode(s: &Shared, org: &Org) -> FtMode {
     let key = format!("{}/{}", org.name, org.logs_table);
     if let Some((at, has)) = s.ft_cache.lock().ok().and_then(|c| c.get(&key).copied())
         && at.elapsed() < FT_CACHE_TTL

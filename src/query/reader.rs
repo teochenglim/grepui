@@ -16,13 +16,24 @@ pub struct SqlxReader {
 impl SqlxReader {
     /// Lazy: grepui starts and serves `/healthz` even when the database is down.
     pub fn lazy(url: &str, timeout: Duration) -> anyhow::Result<Self> {
+        Self::lazy_with(url, timeout, 8)
+    }
+
+    /// Like [`SqlxReader::lazy`] with a connection limit (`--pool-max-connections`).
+    pub fn lazy_with(url: &str, timeout: Duration, max: u32) -> anyhow::Result<Self> {
         Ok(Self {
             pool: MySqlPoolOptions::new()
-                .max_connections(8)
+                .max_connections(max)
                 .acquire_timeout(Duration::from_secs(5))
                 .connect_lazy(url)?,
             timeout,
         })
+    }
+}
+
+impl SqlxReader {
+    pub fn max_connections(&self) -> u32 {
+        self.pool.options().get_max_connections()
     }
 }
 

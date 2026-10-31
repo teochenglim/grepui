@@ -441,6 +441,9 @@ pub const ITEM_KINDS: &[&str] = &[
     // v0.12.0: work groups (per org, keyed by role) and source settings (platform rows).
     "workgroup",
     "source",
+    // v0.13.0: scheduled reports and what the last run of each did.
+    "report",
+    "reportstate",
 ];
 
 fn item_kind(kind: &str) -> Result<Bind> {

@@ -14,6 +14,8 @@ pub mod logs;
 pub mod metrics;
 pub mod pipelines;
 pub mod redaction;
+pub mod reports;
+pub mod rum;
 pub mod services;
 pub mod sql;
 pub mod storage;
@@ -66,6 +68,10 @@ pub struct AppState {
     pub workload: Arc<crate::workload::Workload>,
     /// Extra GreptimeDB sources for fan-out reads.
     pub sources: crate::workload::Sources,
+    /// `/metrics` counters (ADR 0014).
+    pub metrics: Arc<crate::metrics::Metrics>,
+    /// The result cache with single-flight, shared by the primary and every extra source.
+    pub cache: Arc<crate::cache::ResultCache>,
 }
 
 pub type Shared = Arc<AppState>;
@@ -126,10 +132,22 @@ impl AppState {
         cfg.validate()?;
         let orgs = Orgs::from_config(&cfg)?;
         let workload = Arc::new(crate::workload::Workload::default());
-        let reader: Arc<dyn Reader> = Arc::new(crate::workload::Governed::new(
-            reader,
-            workload.clone(),
-            clock.clone(),
+        let metrics = Arc::new(crate::metrics::Metrics::default());
+        let cache = Arc::new(crate::cache::ResultCache::new(
+            std::time::Duration::from_secs(cfg.cache_ttl_secs),
+            cfg.cache_max_entries,
+            cfg.cache_max_mb as usize * 1024 * 1024,
+            metrics.clone(),
+        ));
+        let reader: Arc<dyn Reader> = Arc::new(crate::cache::Cached::new(
+            Arc::new(crate::workload::Governed::new(
+                reader,
+                workload.clone(),
+                clock.clone(),
+                metrics.clone(),
+            )),
+            cache.clone(),
+            crate::workload::PRIMARY,
         ));
         Ok(Arc::new(AppState {
             cfg: Arc::new(cfg),
@@ -146,6 +164,8 @@ impl AppState {
             audit: Default::default(),
             workload,
             sources: Default::default(),
+            metrics,
+            cache,
         }))
     }
 
@@ -302,10 +322,15 @@ impl AppState {
     pub fn add_source(&self, name: &str, reader: Arc<dyn Reader>) {
         self.sources.add(
             name,
-            Arc::new(crate::workload::Governed::new(
-                reader,
-                self.workload.clone(),
-                self.clock.clone(),
+            Arc::new(crate::cache::Cached::new(
+                Arc::new(crate::workload::Governed::new(
+                    reader,
+                    self.workload.clone(),
+                    self.clock.clone(),
+                    self.metrics.clone(),
+                )),
+                self.cache.clone(),
+                name,
             )),
         );
     }
@@ -341,6 +366,7 @@ pub fn ok<T: Serialize>(data: T, meta: Meta) -> Response {
 /// (read-only proof, method checks); `router` below must register exactly these.
 pub const ROUTES: &[&str] = &[
     "/healthz",
+    "/metrics",
     "/api/v1/health",
     "/api/v1/info",
     "/api/v1/orgs",
@@ -442,6 +468,17 @@ pub const ROUTES: &[&str] = &[
     "/api/v1/orgs/{org}/enrichment/{name}/join",
     "/api/v1/orgs/{org}/redaction",
     "/api/v1/orgs/{org}/redaction/{id}",
+    "/api/v1/orgs/{org}/rum/status",
+    "/api/v1/orgs/{org}/rum/sites",
+    "/api/v1/orgs/{org}/rum/overview",
+    "/api/v1/orgs/{org}/rum/vitals",
+    "/api/v1/orgs/{org}/rum/errors",
+    "/api/v1/orgs/{org}/rum/sessions",
+    "/api/v1/orgs/{org}/reports",
+    "/api/v1/orgs/{org}/reports/{id}",
+    "/api/v1/orgs/{org}/reports/{id}/preview",
+    "/api/v1/orgs/{org}/reports/{id}/run",
+    "/api/v1/orgs/{org}/reports/{id}/history",
     "/api/v1/orgs/{org}/workgroups",
     "/api/v1/orgs/{org}/workgroups/{role}",
     "/api/v1/orgs/{org}/queries",
@@ -527,6 +564,10 @@ pub const WRITE_ROUTES: &[(&str, &str)] = &[
     ("POST", "/api/v1/orgs/{org}/redaction"),
     ("PUT", "/api/v1/orgs/{org}/redaction/{id}"),
     ("DELETE", "/api/v1/orgs/{org}/redaction/{id}"),
+    ("POST", "/api/v1/orgs/{org}/reports"),
+    ("PUT", "/api/v1/orgs/{org}/reports/{id}"),
+    ("DELETE", "/api/v1/orgs/{org}/reports/{id}"),
+    ("POST", "/api/v1/orgs/{org}/reports/{id}/run"),
     ("PUT", "/api/v1/orgs/{org}/workgroups/{role}"),
     ("DELETE", "/api/v1/orgs/{org}/workgroups/{role}"),
     ("POST", "/api/v1/orgs/{org}/queries/{id}/cancel"),
@@ -541,6 +582,7 @@ pub const MAX_BODY: usize = 64 * 1024;
 pub fn router(state: Shared) -> Router {
     Router::new()
         .route("/healthz", get(health::healthz))
+        .route("/metrics", get(health::metrics))
         .route("/api/v1/health", get(health::health))
         .route("/api/v1/info", get(info))
         .route("/api/v1/orgs", get(orgs))
@@ -835,6 +877,32 @@ pub fn router(state: Shared) -> Router {
         .route(
             "/api/v1/orgs/{org}/redaction/{id}",
             axum::routing::put(redaction::update).delete(redaction::delete),
+        )
+        .route("/api/v1/orgs/{org}/rum/status", get(rum::status))
+        .route("/api/v1/orgs/{org}/rum/sites", get(rum::sites))
+        .route("/api/v1/orgs/{org}/rum/overview", get(rum::overview))
+        .route("/api/v1/orgs/{org}/rum/vitals", get(rum::vitals))
+        .route("/api/v1/orgs/{org}/rum/errors", get(rum::errors))
+        .route("/api/v1/orgs/{org}/rum/sessions", get(rum::sessions))
+        .route(
+            "/api/v1/orgs/{org}/reports",
+            get(reports::list).post(reports::create),
+        )
+        .route(
+            "/api/v1/orgs/{org}/reports/{id}",
+            axum::routing::put(reports::update).delete(reports::delete),
+        )
+        .route(
+            "/api/v1/orgs/{org}/reports/{id}/preview",
+            get(reports::preview),
+        )
+        .route(
+            "/api/v1/orgs/{org}/reports/{id}/run",
+            axum::routing::post(reports::run_now),
+        )
+        .route(
+            "/api/v1/orgs/{org}/reports/{id}/history",
+            get(reports::history),
         )
         .route("/api/v1/orgs/{org}/workgroups", get(workload::groups_list))
         .route(

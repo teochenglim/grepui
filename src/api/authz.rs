@@ -82,7 +82,12 @@ fn same_site(h: &HeaderMap) -> bool {
 fn audited(template: &str, method: &Method) -> bool {
     if matches!(
         template,
-        "/healthz" | "/api/v1/health" | "/api/v1/info" | "/api/v1/auth/me" | "/api/v1/orgs"
+        "/healthz"
+            | "/metrics"
+            | "/api/v1/health"
+            | "/api/v1/info"
+            | "/api/v1/auth/me"
+            | "/api/v1/orgs"
     ) {
         return false;
     }
@@ -104,7 +109,28 @@ fn params(q: Option<&str>, key: &str) -> i64 {
     .unwrap_or(0)
 }
 
+/// Count every answer by matched route (R-O2), then do the access work.
 pub async fn layer(
+    axum::extract::State(s): axum::extract::State<Shared>,
+    req: Request,
+    next: Next,
+) -> Response {
+    let template = req
+        .extensions()
+        .get::<MatchedPath>()
+        .map(|m| m.as_str().to_string())
+        .unwrap_or_default();
+    let res = access(axum::extract::State(s.clone()), req, next).await;
+    s.metrics.request(&template, res.status().as_u16());
+    res
+}
+
+/// Equal text without stopping at the first difference.
+fn same_secret(a: &str, b: &str) -> bool {
+    a.len() == b.len() && a.bytes().zip(b.bytes()).fold(0u8, |d, (x, y)| d | (x ^ y)) == 0
+}
+
+async fn access(
     axum::extract::State(s): axum::extract::State<Shared>,
     mut req: Request,
     next: Next,
@@ -121,6 +147,19 @@ pub async fn layer(
     // A method the table does not know for this route is not allowed for anyone.
     if access == Access::Deny {
         return deny(StatusCode::METHOD_NOT_ALLOWED, "method not allowed");
+    }
+    // A scraper may present the metrics token instead of a platform admin's session.
+    if template == "/metrics"
+        && let Some(want) = s.cfg.metrics_token.as_deref()
+        && req
+            .headers()
+            .get(header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "))
+            .is_some_and(|t| same_secret(t.trim(), want))
+    {
+        req.extensions_mut().insert(Identity::anonymous());
+        return next.run(req).await;
     }
     let mut identity = if s.cfg.no_auth {
         Identity::local()

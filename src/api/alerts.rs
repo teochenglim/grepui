@@ -366,6 +366,14 @@ async fn history(
     let (rows, meta) = s.read_store(q).await?;
     let out: Vec<Value> = rows
         .into_iter()
+        // Scheduled reports keep their runs in the same table under `report:<id>`.
+        .filter(|r| {
+            alert.is_some()
+                || !r["alert_id"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .starts_with("report:")
+        })
         .map(|mut r| {
             let d = r["detail"]
                 .as_str()
@@ -553,6 +561,7 @@ pub async fn dest_test(
     let d: Destination = serde_json::from_str(&row.spec).map_err(invalid)?;
     let now = s.now_ms();
     let m = Message {
+        html: false,
         subject: "[grepui] test notification".into(),
         body: format!(
             "This is a test from grepui for the destination {:?}.",

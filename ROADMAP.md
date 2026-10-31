@@ -4,8 +4,8 @@ Status per release is in `RELEASE.md` (roll-up) and `RELEASE/` (detail). This fi
 
 ## Release train (planned releases 0.9 to 1.0)
 
-1. **0.1 to 0.12 are built** (foundation, logs, state and data health, traces, services and service map, metrics, rollups and retention, dashboards, alerts and incidents, pipelines/functions/enrichment/redaction); see `RELEASE.md`.
-2. **LLM track** (L1 onward) and **0.13 Reports, RUM view, operate**: next.
+1. **0.1 to 0.13 are built** (foundation, logs, state and data health, traces, services and service map, metrics, rollups and retention, dashboards, alerts and incidents, pipelines/functions/enrichment/redaction); see `RELEASE.md`.
+2. **LLM track** (L1 onward) and **1.0 hardening**: next.
 3. **0.7 Rollups and extended retention** (D5): long windows and TTL tiers.
 4. **0.8 Dashboards, 0.9 Alerts and incidents, 0.10 Pipelines/functions/enrichment/redaction**: the parity modules.
 5. **0.11 Access control, multi-tenancy, SSO, audit; 0.12 Query management, work groups, federation; 0.13 Reports, RUM view, operate**: the enterprise tier.

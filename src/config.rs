@@ -103,6 +103,28 @@ pub struct Config {
     /// Per-query timeout in seconds.
     #[arg(long, env = "GREPUI_QUERY_TIMEOUT_SECS", default_value_t = 30)]
     pub query_timeout_secs: u64,
+    /// Result cache lifetime in seconds; 0 turns the cache off (v0.13.0).
+    #[arg(long, env = "GREPUI_CACHE_TTL_SECS", default_value_t = 5)]
+    pub cache_ttl_secs: u64,
+    /// Most entries the result cache keeps.
+    #[arg(long, env = "GREPUI_CACHE_MAX_ENTRIES", default_value_t = 1000)]
+    pub cache_max_entries: usize,
+    /// Most memory (an estimate, in MiB) the result cache keeps.
+    #[arg(long, env = "GREPUI_CACHE_MAX_MB", default_value_t = 64)]
+    pub cache_max_mb: u64,
+    /// Connections to GreptimeDB per source.
+    #[arg(long, env = "GREPUI_POOL_MAX_CONNECTIONS", default_value_t = 8)]
+    pub pool_max_connections: u32,
+    /// Seconds to let running requests finish after SIGTERM or Ctrl-C.
+    #[arg(long, env = "GREPUI_SHUTDOWN_GRACE_SECS", default_value_t = 30)]
+    pub shutdown_grace_secs: u64,
+    /// The account in --greptime-mysql is meant to be read-only: at startup, try to create a
+    /// probe table in the default org's database and warn if that works.
+    #[arg(long, env = "GREPUI_READ_ONLY_USER")]
+    pub read_only_user: bool,
+    /// Bearer token that may read /metrics (otherwise a platform admin is needed).
+    #[arg(long, env = "GREPUI_METRICS_TOKEN")]
+    pub metrics_token: Option<String>,
 }
 
 impl Default for Config {
@@ -135,6 +157,14 @@ impl Default for Config {
             smtp: None,
             smtp_from: "grepui@localhost.localdomain".into(),
             query_timeout_secs: 30,
+            // Library and test default: no cache, so every read reaches the reader.
+            cache_ttl_secs: 0,
+            cache_max_entries: 1000,
+            cache_max_mb: 64,
+            pool_max_connections: 8,
+            shutdown_grace_secs: 30,
+            read_only_user: false,
+            metrics_token: None,
         }
     }
 }
@@ -216,6 +246,23 @@ impl Config {
             if !seen.insert(n) {
                 anyhow::bail!("--source: a name is used twice");
             }
+        }
+        if self.pool_max_connections == 0 || self.pool_max_connections > 100 {
+            anyhow::bail!("--pool-max-connections must be between 1 and 100");
+        }
+        if self.cache_ttl_secs > 3600 {
+            anyhow::bail!("--cache-ttl-secs must be at most 3600 (0 turns the cache off)");
+        }
+        if self.cache_max_entries == 0 || self.cache_max_mb == 0 || self.cache_max_mb > 4096 {
+            anyhow::bail!(
+                "--cache-max-entries must be at least 1 and --cache-max-mb between 1 and 4096"
+            );
+        }
+        if self.shutdown_grace_secs > 600 {
+            anyhow::bail!("--shutdown-grace-secs must be at most 600");
+        }
+        if self.metrics_token.as_ref().is_some_and(|t| t.len() < 16) {
+            anyhow::bail!("--metrics-token must be at least 16 characters");
         }
         if self.query_timeout_secs == 0 || self.query_timeout_secs > 600 {
             anyhow::bail!("--query-timeout-secs must be between 1 and 600");

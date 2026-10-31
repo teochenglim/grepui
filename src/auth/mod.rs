@@ -131,6 +131,7 @@ const ADMIN_MUTATING: &[&str] = &[
     "/tokens",
     "/branding",
     "/workgroups",
+    "/reports",
 ];
 /// Paths whose reads need an org admin (they show people, secrets or rules).
 const ADMIN_READING: &[&str] = &[
@@ -140,6 +141,7 @@ const ADMIN_READING: &[&str] = &[
     "/redaction",
     "/workgroups",
     "/queries/stats",
+    "/reports",
 ];
 
 /// The exhaustive route classification. Anything not named here is `Deny`.
@@ -149,6 +151,8 @@ pub fn access_for(method: &Method, template: &str) -> Access {
     match template {
         "/healthz" | "/api/v1/health" | "/api/v1/info" if get => return Access::Anonymous,
         "/api/v1/orgs" if get => return Access::Authenticated,
+        // Counters of the whole process: a platform admin, or a scraper with --metrics-token.
+        "/metrics" if get => return Access::Platform,
         "/api/v1/auth/me" if get => return Access::Anonymous,
         "/api/v1/auth/setup" | "/api/v1/auth/login" if post => return Access::Anonymous,
         "/api/v1/auth/oidc/login" | "/api/v1/auth/oidc/callback" if get => {

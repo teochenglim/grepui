@@ -19,12 +19,12 @@ Status: `planned` (requirement ID and release; a row whose release is `ready` or
 | Field detection, schema settings, field types | read | | planned R-L3, R-S4, 0.2 and 0.3 | Types from `information_schema` |
 | Quick mode and interesting fields | nav | | planned R-L3, 0.2 | |
 | Search Around (N events before and after, ignores filters) | read | | planned R-L4, 0.2 | |
-| Save views, scheduled recurring searches | read (phrase only) | | planned R-S2 (0.3), R-A1 (0.9), R-E1 (0.13) | |
+| Save views, scheduled recurring searches | read (phrase only) | | built R-S2 (0.3), R-A1 (0.9), R-E1 (0.13) | |
 | Export | read (phrase only) | | planned R-L7, 0.2 | CSV and NDJSON |
 | Auto Run (re-run on change) | read | | planned, UI behaviour of R-L1 | Recorded in the 0.2 browser pass |
 | Query history | unconfirmed | | planned R-S3, 0.3 | |
 | Explain and Analyze query | nav | | planned via R-L5 (`EXPLAIN`) | |
-| Refresh cache / run query | nav | | planned R-O1, 0.13 | Cache bypass parameter |
+| Refresh cache / run query | nav | | built R-O1, 0.13 | 5 s result cache; no per-request bypass yet |
 | Cross-linking between signals | nav | | built R-R6, 0.4 | D1 |
 | VRL functions on logs | read | | built (differs) R-N2, 0.10 | Saved SQL functions, bound arguments, no recursion, no VRL |
 | Insights (root-cause analysis over anomaly periods) | nav | | gap | Revisit after 1.0 |
@@ -68,7 +68,7 @@ Status: `planned` (requirement ID and release; a row whose release is `ready` or
 | Variables and filters | nav | | built R-B3, 0.8 | Values bound as parameters |
 | Public dashboards, TV mode, TV playlist | nav | | built R-B6, 0.8 | |
 | Comparison against past period | nav | | built R-B4, 0.8 | |
-| Histogram caching | nav | | planned R-O1, 0.13 | |
+| Histogram caching | nav | | built R-O1, 0.13 | Same cache and single-flight |
 | Annotation sources, folder icons, drilldowns | nav / unconfirmed | | gap | Re-check docs; revisit after 1.0 |
 | Grafana dashboard import | unconfirmed | | gap | |
 
@@ -117,7 +117,7 @@ Status: `planned` (requirement ID and release; a row whose release is `ready` or
 
 | Feature | Evidence | Edition | grepui | Notes |
 |---|---|---|---|---|
-| Browser RUM: page load, Core Web Vitals, errors, resources, user interactions | read | | planned R-U1, 0.13 | Reads GrepRUM tables |
+| Browser RUM: page load, Core Web Vitals, errors, resources, user interactions | read | | built R-U1, 0.13 | Reads GrepRUM's events table; INP only (all GrepRUM collects) |
 | Session replay | read | | gap | GrepRUM does not record replays |
 | Mobile RUM (React Native, Android, iOS; beta) | read | | gap | |
 
@@ -125,7 +125,7 @@ Status: `planned` (requirement ID and release; a row whose release is `ready` or
 
 | Feature | Evidence | Edition | grepui | Notes |
 |---|---|---|---|---|
-| Scheduled reports | nav | | planned R-E1, 0.13 | HTML and CSV by email |
+| Scheduled reports | nav | | built R-E1, 0.13 | HTML and CSV by email; PDF is a gap |
 | PDF output | unconfirmed | | gap | |
 
 ## Identity, tenancy and enterprise tier

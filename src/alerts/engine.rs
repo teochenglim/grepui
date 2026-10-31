@@ -541,6 +541,7 @@ pub fn build_message(
     });
     (
         Message {
+            html: false,
             subject,
             body,
             payload,
@@ -840,8 +841,12 @@ impl Engine {
             return;
         }
         let ev = match evaluate(&self.s, org, rule, now, &ctx.states).await {
-            Ok(ev) => ev,
+            Ok(ev) => {
+                self.s.metrics.alert_evaluation(true);
+                ev
+            }
             Err(e) => {
+                self.s.metrics.alert_evaluation(false);
                 st.state = "error".into();
                 st.error = e.clone();
                 st.last_eval_ms = now;

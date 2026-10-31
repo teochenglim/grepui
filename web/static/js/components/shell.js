@@ -14,6 +14,7 @@ const LIVE = [
   ['dashboards', 'Dashboards'],
   ['alerts', 'Alerts'],
   ['metrics', 'Metrics'],
+  ['rum', 'RUM'],
   ['services', 'Services'],
   ['service-map', 'Service map'],
   ['catalog', 'Catalog'],
@@ -28,8 +29,7 @@ const LIVE = [
   ['connect', 'Connect'],
 ];
 const SOON = [
-  ['Reports', 'v0.13'],
-  ['RUM', 'v0.13'],
+  ['LLM traces', 'L1'],
 ];
 
 /** Who is signed in, with sign-out (R-C1). With --no-auth there is nobody to sign out. */
@@ -68,6 +68,7 @@ export function buildShell(root) {
       LIVE.map(([k, label]) => h('a', { class: `nav${cur === k ? ' active' : ''}`, href: href(k) }, label)),
       roleIn(state.org) === 'admin' || session.me?.platform_admin ? h('h3', null, 'Manage') : null,
       roleIn(state.org) === 'admin' ? h('a', { class: `nav${cur === 'admin' ? ' active' : ''}`, href: href('admin') }, 'Administration') : null,
+      roleIn(state.org) === 'admin' ? h('a', { class: `nav${cur === 'reports' ? ' active' : ''}`, href: href('reports') }, 'Reports') : null,
       session.me?.platform_admin && !session.me?.no_auth ? h('a', { class: `nav${cur === 'platform' ? ' active' : ''}`, href: href('platform') }, 'Platform') : null,
       h('h3', null, 'Coming'),
       SOON.map(([label, v]) => h('span', { class: 'nav soon', title: `Planned for ${v}` }, label, h('span', { class: 'badge' }, v))),

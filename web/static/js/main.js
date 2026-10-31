@@ -29,12 +29,16 @@ import { streamDetailPage } from './pages/stream-detail.js';
 import { streamsPage } from './pages/streams.js';
 import { loginPage } from './pages/login.js';
 import { adminPage } from './pages/admin.js';
+import { reportsPage } from './pages/reports.js';
+import { rumPage } from './pages/rum.js';
 import { platformPage } from './pages/platform.js';
 import { applyBranding } from './components/branding.js';
 import { parseHash, route, start } from './router.js';
 import { session, state } from './state.js';
 
 route('admin', adminPage);
+route('reports', reportsPage);
+route('rum', rumPage);
 route('platform', platformPage);
 route('logs', logsPage);
 route('traces', tracesPage);

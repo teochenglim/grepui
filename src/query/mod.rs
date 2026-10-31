@@ -6,6 +6,7 @@ pub mod filter;
 pub mod logs;
 pub mod metrics;
 pub mod reader;
+pub mod rum;
 pub mod services;
 pub mod sqlmode;
 pub mod traces;

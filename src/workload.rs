@@ -355,11 +355,28 @@ pub struct Governed {
     inner: Arc<dyn Reader>,
     w: Arc<Workload>,
     clock: crate::api::Clock,
+    m: Arc<crate::metrics::Metrics>,
 }
 
 impl Governed {
-    pub fn new(inner: Arc<dyn Reader>, w: Arc<Workload>, clock: crate::api::Clock) -> Governed {
-        Governed { inner, w, clock }
+    pub fn new(
+        inner: Arc<dyn Reader>,
+        w: Arc<Workload>,
+        clock: crate::api::Clock,
+        m: Arc<crate::metrics::Metrics>,
+    ) -> Governed {
+        Governed { inner, w, clock, m }
+    }
+
+    /// Count a read that reached (or tried to reach) the database; a limit that stopped it first
+    /// is not a database read.
+    fn count(&self, t: Instant, r: &Result<Vec<Value>, ReadError>) {
+        if !matches!(r, Err(ReadError::Quota(_))) {
+            self.m.db(
+                t.elapsed().as_millis() as u64,
+                !matches!(r, Err(ReadError::Db(_) | ReadError::Timeout)),
+            );
+        }
     }
 
     async fn go(&self, q: &Q, max: Option<usize>) -> Result<Vec<Value>, ReadError> {
@@ -425,10 +442,16 @@ impl Governed {
 #[async_trait]
 impl Reader for Governed {
     async fn fetch(&self, q: &Q) -> Result<Vec<Value>, ReadError> {
-        self.go(q, None).await
+        let t = Instant::now();
+        let r = self.go(q, None).await;
+        self.count(t, &r);
+        r
     }
     async fn fetch_max(&self, q: &Q, max: usize) -> Result<Vec<Value>, ReadError> {
-        self.go(q, Some(max)).await
+        let t = Instant::now();
+        let r = self.go(q, Some(max)).await;
+        self.count(t, &r);
+        r
     }
     async fn kill(&self, id: &str) -> Result<(), ReadError> {
         self.inner.kill(id).await

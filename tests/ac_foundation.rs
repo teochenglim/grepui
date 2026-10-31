@@ -324,6 +324,8 @@ async fn ac_0_1_4_every_listed_route_exists() {
             || route.ends_with("/workgroups/{role}")
             || route.ends_with("/platform/sources/{name}")
             || route.ends_with("/cancel")
+            || route.ends_with("/reports/{id}")
+            || route.ends_with("/reports/{id}/run")
             || route.ends_with("/tokens/{id}");
         if !write_only {
             assert_ne!(r.status, StatusCode::METHOD_NOT_ALLOWED, "{route}");

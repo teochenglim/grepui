@@ -2,7 +2,7 @@
 
 The single place to see where grepui stands: what is shipped, what is planned, what each release proves, and how a release is cut. Per-release detail (scope, acceptance criteria, named tests, checklist) lives in [`RELEASE/vX.Y.Z.md`](RELEASE/README.md); this file is the readable roll-up and the changelog.
 
-> **Current state:** v0.1.0 to v0.12.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.12.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
+> **Current state:** v0.1.0 to v0.13.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.12.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
 
 ## 1. Summary
 
@@ -21,12 +21,12 @@ grepui is a multi-tenant observability UI for GreptimeDB: one Rust binary (axum)
 
 ## 2. Release status
 
-Latest built: **v0.12.0: Query management, work groups and federation** (ready). Newest first.
+Latest built: **v0.13.0: Reports, RUM view and operate** (ready). Newest first.
 
 | Release | Theme | Status | ACs | Requirements covered |
 |---|---|---|---|---|
 | [v1.0.0](RELEASE/v1.0.0.md) | Launch hardening | planned | 2 | R-C2 R-F4 R-Q1 |
-| [v0.13.0](RELEASE/v0.13.0.md) | Reports, RUM view and operate | planned | 5 | R-E1 R-O1 R-O2 R-O3 R-U1 |
+| [v0.13.0](RELEASE/v0.13.0.md) | Reports, RUM view and operate | ready | 5 | R-E1 R-O1 R-O2 R-O3 R-U1 |
 | [v0.12.0](RELEASE/v0.12.0.md) | Query management, work groups and federation | ready | 5 | R-W1 R-W2 R-W3 R-Y1 R-Y2 |
 | [v0.11.0](RELEASE/v0.11.0.md) | Access control, multi-tenancy, SSO and audit | ready | 7 | R-C1 R-C2 R-C3 R-C4 R-C5 R-C6 |
 | [v0.10.0](RELEASE/v0.10.0.md) | Pipelines, functions, enrichment, redaction | ready | 4 | R-F4 R-N1 R-N2 R-N3 R-N4 |
@@ -60,6 +60,12 @@ Newest first. An entry is written when a release becomes `ready`; the same text 
 ### Unreleased
 
 - Requirements, architecture, positioning and parity matrix (ARCH 00–07), release plan with ACs for v0.1.0–v1.0.0, `scripts/seed.py` (demo traces and logs over OTLP/protobuf, `--db` per org).
+
+### v0.13.0: Reports, RUM view and operate (ready)
+
+Added: scheduled reports (a dashboard or saved logs view as an HTML page or CSV, emailed on a cron schedule, sent once per slot across replicas, every run recorded, masked by the redaction rules as a viewer); a RUM view over GrepRUM's `events` table (page views, INP percentiles and ratings, JavaScript errors with stacks, sessions; a clear "not installed" state); a short-lived result cache with single-flight keyed by source, org, role, statement and binds, bounded in entries and bytes; `/metrics` in Prometheus text (requests by route, database latency histogram, cache and alert counters); graceful shutdown on SIGTERM with a grace period; `--pool-max-connections`; and an opt-in `--read-only-user` startup check (ADR 0014). UI: Reports (admins) and RUM pages. Fixed on the way: HTML mail bodies are base64-encoded so no SMTP line passes 998 characters.
+
+No schema change (new kinds `report` and `reportstate` in `grepui_alert_items`). New flags `--cache-ttl-secs` (5), `--cache-max-entries`, `--cache-max-mb`, `--pool-max-connections`, `--shutdown-grace-secs`, `--read-only-user`, `--metrics-token`; no new dependencies. Limits: PDF reports and session replay are not supported; delivery is at most once per slot; a report HTML shows 200 rows per section (CSV carries all); the cache is per process with no per-request bypass; `/metrics` does not count unmatched paths; RUM reads INP only (all GrepRUM collects).
 
 ### v0.12.0: Query management, work groups and federation (ready)
 
@@ -141,12 +147,6 @@ Will add: Golden files for every response shape; Compatibility run on the pinned
 
 No new requirement IDs.
 
-### v0.13.0: Reports, RUM view and operate (planned)
-
-Will add: Scheduled reports (HTML/CSV by email); RUM view over GrepRUM tables; Result cache with single-flight, `/metrics`, graceful shutdown, read-only-user check.
-
-Session replay and PDF reports are not supported; ARCH 07 lists them as gaps.
-
 ### v0.11.0: Access control, multi-tenancy, SSO and audit (planned)
 
 Will add: Local users, organizations (tenants), roles, sessions; multi-tenant UI with org switcher, branding and org admins; RBAC enforced in the query layer for every endpoint; API tokens and service accounts; OpenID Connect SSO; Audit trail with search.
@@ -183,6 +183,7 @@ Honest ledger of what has actually been run. Updated as releases land.
 | OpenInference spans on trace v2 (JSON2) | spike on v1.3.0: stored with 19 fixed columns (300 indexed messages and a 200 KB prompt in one span), queried with `json_get_*(col, '["key"]')`; grepui's trace list/waterfall/logs work on a v2 table, its span panel and attribute filters do not yet (roadmap LLM track L1) |
 | CI-parity run (fresh `make db-down db-up`, seed, `make test-db`) | green for every live test after the v0.4.0 fixes; it reproduced the v0.3.0 CI failure and found the join bug below |
 | **GreptimeDB v1.2.1: `IN (subquery)`, `EXISTS` and self-joins on a telemetry table return wrong, nondeterministic rows** | verified live (4 / 6 / 5 / 0 for a true 33); no such query is used (ADR 0007); the v0.5.0 dependency self-join is verified correct on v1.3.0 (`ac_0_5_3_dependencies_live`) |
+| Reports, RUM, cache, metrics, shutdown, read-only check (v0.13.0): report render and mail, once per slot between two schedulers, failures recorded, six identical concurrent reads hit the database once, TTL and bounds, metrics counters move, in-flight request survives shutdown | verified live for RUM (exact counts of page views, sessions, visitors, INP ratings, error groups against known rows in a throwaway database); the rest offline with fakes; in a browser: RUM tabs on real data, Reports page, and a real 200 KB HTML email through a local SMTP sink (found and fixed the 998-character line limit). Not exercised: a real mail provider, two real processes sharing a store for the once-per-slot claim, SIGTERM on a container, `--read-only-user` against a genuinely read-only GreptimeDB account |
 | Query management and federation (v0.12.0): work-group quotas, running list and cancel, statistics, fan-out merge, source RBAC and disable | verified live (a cross join of a seeded log table shows in `information_schema.process_list` and matches grepui's statement text; a real `KILL` removes the process and ends the read; grepui-side cancel is prompt; a twin source over the same data returns exactly twice the rows, newest first); browser pass on Queries, Work groups, Sources and the Logs source picker. Not exercised: two genuinely separate clusters, more than one replica sharing a source switch |
 | Access control (v0.11.0): sessions, deny by default over every route, isolation matrix across two orgs, tokens, audit, org create/delete cascade | verified live (first admin once, cross-org blocking, a real `CREATE DATABASE`, the cascade, audit search) and in a browser (sign-in, administration, tokens, audit, platform orgs); OIDC verified against a local stand-in provider with generated keys, not a real one; the TLS client verified against example.com and a wrong-host certificate; the SSO redirect in a browser not exercised |
 | Pipelines, functions, enrichment, redaction (v0.10.0) | pipeline create/version/dry-run/delete verified live against GreptimeDB v1.3.0 (`ac_0_10_1_pipeline_live`); enrichment upload and the join helper verified live with exact per-tier counts (`ac_0_10_3_enrichment_join_live`); bound function arguments verified live; redaction verified on a live response; pipelines also tested against a local stand-in for the HTTP API; the role model is a stand-in (admin = `--admin-writes`) |

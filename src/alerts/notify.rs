@@ -22,6 +22,8 @@ pub struct Message {
     pub subject: String,
     pub body: String,
     pub payload: Value,
+    /// The body is an HTML page (reports); alerts send plain text.
+    pub html: bool,
 }
 
 #[async_trait]
@@ -80,7 +82,7 @@ impl Sender for NetSender {
         match to.kind.as_str() {
             "webhook" => webhook(&to.url, &m.payload).await,
             "email" => match &self.smtp {
-                Some(s) => email(s, &to.to, &m.subject, &m.body).await,
+                Some(s) => email_as(s, &to.to, &m.subject, &m.body, m.html).await,
                 None => Err(
                     "email is not configured: start grepui with --smtp host:port and --smtp-from"
                         .into(),
@@ -177,19 +179,44 @@ fn b64(data: &[u8]) -> String {
 /// dot-stuffing. The subject is one line and encoded if it is not ASCII; addresses were validated
 /// to hold no whitespace, so no header can be injected.
 pub fn mail_text(from: &str, to: &[String], subject: &str, body: &str, date: &str) -> String {
+    mail_text_as(from, to, subject, body, date, false)
+}
+
+/// [`mail_text`] with the body as `text/html` when `html` is set.
+pub fn mail_text_as(
+    from: &str,
+    to: &[String],
+    subject: &str,
+    body: &str,
+    date: &str,
+    html: bool,
+) -> String {
+    let kind = if html { "text/html" } else { "text/plain" };
     let subject: String = subject.chars().filter(|c| !c.is_control()).collect();
     let subject = if subject.is_ascii() {
         subject
     } else {
         format!("=?UTF-8?B?{}?=", b64(subject.as_bytes()))
     };
+    // SMTP lines are limited to 998 characters. A page of HTML (or a CSV row with a long field)
+    // can be longer, so such a body travels as base64, which is wrapped at 76.
+    let encode = html || body.lines().any(|l| l.len() > 900);
     let mut out = format!(
-        "From: <{from}>\r\nTo: {}\r\nSubject: {subject}\r\nDate: {date}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n",
+        "From: <{from}>\r\nTo: {}\r\nSubject: {subject}\r\nDate: {date}\r\nMIME-Version: 1.0\r\nContent-Type: {kind}; charset=utf-8\r\nContent-Transfer-Encoding: {}\r\n\r\n",
         to.iter()
             .map(|a| format!("<{a}>"))
             .collect::<Vec<_>>()
-            .join(", ")
+            .join(", "),
+        if encode { "base64" } else { "8bit" }
     );
+    if encode {
+        let enc = b64(body.as_bytes());
+        for chunk in enc.as_bytes().chunks(76) {
+            out.push_str(std::str::from_utf8(chunk).unwrap_or_default());
+            out.push_str("\r\n");
+        }
+        return out;
+    }
     for line in body.replace("\r\n", "\n").replace('\r', "\n").split('\n') {
         if line.starts_with('.') {
             out.push('.');
@@ -249,6 +276,16 @@ async fn cmd(
 /// One message to all recipients over plain SMTP (no STARTTLS, no AUTH: a relay on a trusted
 /// network, ADR 0010).
 pub async fn email(smtp: &Smtp, to: &[String], subject: &str, body: &str) -> Result<(), String> {
+    email_as(smtp, to, subject, body, false).await
+}
+
+pub async fn email_as(
+    smtp: &Smtp,
+    to: &[String],
+    subject: &str,
+    body: &str,
+    html: bool,
+) -> Result<(), String> {
     let mut r = BufReader::new(connect(&smtp.host, smtp.port).await?);
     expect(&mut r, &[220], "the connection").await?;
     cmd(&mut r, "EHLO grepui", &[250], "EHLO").await?;
@@ -272,7 +309,7 @@ pub async fn email(smtp: &Smtp, to: &[String], subject: &str, body: &str) -> Res
     let date = chrono::Utc::now()
         .format("%a, %d %b %Y %H:%M:%S +0000")
         .to_string();
-    let text = mail_text(&smtp.from, to, subject, body, &date);
+    let text = mail_text_as(&smtp.from, to, subject, body, &date, html);
     cmd(&mut r, &format!("{text}."), &[250], "the message").await?;
     let _ = cmd(&mut r, "QUIT", &[221], "QUIT").await;
     Ok(())
