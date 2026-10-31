@@ -86,6 +86,24 @@ pub async fn serve(cfg: Config) -> Result<()> {
         crate::alerts::engine::spawn(app.clone(), app.sender.clone());
         api::reports::spawn(app.clone(), app.sender.clone());
     }
+    // The one supported GreptimeDB is v1.3.0 and newer: say so at start, once, if it is older.
+    match app.reader.fetch(&crate::query::build::db_version()).await {
+        Ok(rows) => {
+            let v = rows
+                .first()
+                .and_then(|r| r["version"].as_str())
+                .unwrap_or_default();
+            if crate::probe::version_supported(v) {
+                tracing::info!(greptimedb = v, "database version supported");
+            } else {
+                tracing::warn!(
+                    greptimedb = v,
+                    "this GreptimeDB is older than v1.3.0, the oldest grepui supports: trace v2 tables, the LLM views and RUM will not work"
+                );
+            }
+        }
+        Err(_) => tracing::warn!("could not read the database version yet"),
+    }
     if app.cfg.read_only_user {
         match crate::probe::check_read_only(app.writer.as_ref(), &app.cfg.database()?).await {
             Ok(crate::probe::Access::ReadOnly) => {

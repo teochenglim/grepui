@@ -1722,7 +1722,7 @@ async fn ac_0_9_1_rule_sql_stays_in_org_database() {
     let other = with(
         base("peek"),
         "query",
-        json!({"kind": "sql", "text": "SELECT count(*) AS n FROM grepui.grepui_alert_items"}),
+        json!({"kind": "sql", "text": "SELECT count(*) AS n FROM other_db.some_table"}),
     );
     let id = t.rule(other).await;
     // ...but it never reaches the database: the run is refused and recorded as an error.
@@ -1751,6 +1751,9 @@ async fn ac_0_9_1_rule_sql_stays_in_org_database() {
     for sql in [
         "INSERT INTO t VALUES (1)",
         "SELECT 1; DROP TABLE t",
+        // grepui's own state tables are refused at save, in any database (v0.17.0).
+        "SELECT count(*) AS n FROM grepui.grepui_alert_items",
+        "SELECT count(*) AS n FROM grepui_alert_items",
         "ADMIN flush_table('t')",
         "TQL EVAL (0, 10, '1s') up",
     ] {

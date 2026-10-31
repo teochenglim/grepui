@@ -4,8 +4,8 @@ Status per release is in `RELEASE.md` (roll-up) and `RELEASE/` (detail). This fi
 
 ## Release train (planned releases 0.9 to 1.0)
 
-1. **0.1 to 0.16 are built** (0.14 is LLM step L1, 0.15 is L2, L4, L5 and masking from L6, 0.16 is L3 and the alerts from L6) (foundation, logs, state and data health, traces, services and service map, metrics, rollups and retention, dashboards, alerts and incidents, pipelines/functions/enrichment/redaction); see `RELEASE.md`.
-2. **1.0 hardening**: next.
+1. **0.1 to 0.17 are built** (0.14 is LLM step L1, 0.15 is L2, L4, L5 and masking from L6, 0.16 is L3 and the alerts from L6) (foundation, logs, state and data health, traces, services and service map, metrics, rollups and retention, dashboards, alerts and incidents, pipelines/functions/enrichment/redaction); see `RELEASE.md`.
+2. **1.0.0 is the evidence release** (vision only, `RELEASE/v1.0.0.md`).
 3. **0.7 Rollups and extended retention** (D5): long windows and TTL tiers.
 4. **0.8 Dashboards, 0.9 Alerts and incidents, 0.10 Pipelines/functions/enrichment/redaction**: the parity modules.
 5. **0.11 Access control, multi-tenancy, SSO, audit; 0.12 Query management, work groups, federation; 0.13 Reports, RUM view, operate**: the enterprise tier.
@@ -40,7 +40,7 @@ Goal: read, search and analyse **OpenInference** (and OTel `gen_ai.*`) traces st
 
 Verified in the L1 spike (v0.14): the real OpenTelemetry SDK with the OpenInference OpenAI instrumentor sends to GreptimeDB's OTLP endpoint with the v2 pipeline headers, and the project is the resource attribute `openinference.project.name`. Still untested: the `arize-phoenix-otel` package itself.
 
-## After 1.0 (not scheduled)
+## After 0.17 (not scheduled)
 
 Live tail, log patterns, insights and root-cause analysis, SLOs, annotation sources, alert notification dependencies, Jaeger API as an alternative trace source, session replay (needs GrepRUM support), PDF reports, prompt playground and span replay, datasets and experiments (Phoenix has them; they need a write path to an LLM provider, which is a separate decision).
 

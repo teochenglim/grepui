@@ -2,7 +2,7 @@
 
 The single place to see where grepui stands: what is shipped, what is planned, what each release proves, and how a release is cut. Per-release detail (scope, acceptance criteria, named tests, checklist) lives in [`RELEASE/vX.Y.Z.md`](RELEASE/README.md); this file is the readable roll-up and the changelog.
 
-> **Current state:** v0.1.0 to v0.16.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.12.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
+> **Current state:** v0.1.0 to v0.17.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.12.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
 
 ## 1. Summary
 
@@ -13,7 +13,7 @@ grepui is a multi-tenant observability UI for GreptimeDB: one Rust binary (axum)
 | Language / runtime | Rust (edition 2024), axum 0.8, sqlx (MySQL protocol to GreptimeDB), no Node anywhere |
 | Pinned GreptimeDB | `v1.3.0` (`GREPTIME_VERSION` in the Makefile, the compose file, CI); v1.2.x is unsupported |
 | Tenancy | Multi-tenant from v0.1.0: org-scoped routes; orgs map to GreptimeDB databases |
-| Releases planned | 15 (v0.1.0 to v0.14.0, then v1.0.0) |
+| Releases planned | 17 (v0.1.0 to v0.17.0), then v1.0.0 (vision only) |
 | Requirements | 80 (`ARCH/00_requirements_traceability.md`) |
 | Acceptance criteria | 82, each governed by at least two named tests (`make ac-map`) |
 | Licence | Apache-2.0 |
@@ -21,11 +21,12 @@ grepui is a multi-tenant observability UI for GreptimeDB: one Rust binary (axum)
 
 ## 2. Release status
 
-Latest built: **v0.16.0: LLM traces, metric-level views** (ready). Newest first.
+Latest built: **v0.17.0: Hardening** (ready). Newest first.
 
 | Release | Theme | Status | ACs | Requirements covered |
 |---|---|---|---|---|
-| [v1.0.0](RELEASE/v1.0.0.md) | Launch hardening | planned | 2 | R-C2 R-F4 R-Q1 |
+| [v1.0.0](RELEASE/v1.0.0.md) | Better than the reference platform, shown by evidence (vision only) | planned | 0 | none yet |
+| [v0.17.0](RELEASE/v0.17.0.md) | Hardening (golden API shapes, supported version, security review, security headers) | ready | 4 | R-C2 R-F4 R-Q1 R-O3 R-O4 |
 | [v0.16.0](RELEASE/v0.16.0.md) | LLM traces, metric-level views (analytics, sessions, alerts) | ready | 3 | R-AI5 R-AI6 R-AI10 |
 | [v0.15.0](RELEASE/v0.15.0.md) | LLM traces, trace-level views (span views, evaluations, agent graph, content protection) | ready | 5 | R-AI3 R-AI4 R-AI7 R-AI8 R-AI9 |
 | [v0.14.0](RELEASE/v0.14.0.md) | LLM traces, step L1 (trace layouts and Connect) | ready | 2 | R-AI1 R-AI2 |
@@ -52,7 +53,7 @@ Status vocabulary: `planned` (ACs written, no code) → `in progress` (tests bei
 3. **0.7 Rollups and extended retention.** Long windows and TTL tiers (first DDL writes).
 4. **0.8 Dashboards, 0.9 Alerts and incidents, 0.10 Pipelines/functions/enrichment/redaction.** The parity modules.
 5. **0.11 Access control, multi-tenancy, SSO, audit; 0.12 Query management, work groups, federation; 0.13 Reports, RUM view, operate.** The enterprise tier.
-6. **1.0 Hardening.** API frozen by golden files, compatibility on two GreptimeDB versions, security review.
+6. **0.17 Hardening.** API frozen by golden files, supported GreptimeDB version stated and checked at start-up (v1.3.0 only), security review, security headers. **1.0.0 is the evidence release** (vision only, `RELEASE/v1.0.0.md`): every comparison with the reference platform and other products backed by a test or measurement in the repo, the gap list closed, every ADR re-read. Its scope is written once the owner answers the open decisions in that file.
 
 Not scheduled: Jaeger API as an alternative trace source, `greptime_trace_v2` (JSON2 attributes), anomaly ML beyond MAD, session replay, PDF reports. See [`ROADMAP.md`](ROADMAP.md) and the gaps in `ARCH/07`.
 
@@ -62,7 +63,13 @@ Newest first. An entry is written when a release becomes `ready`; the same text 
 
 ### Unreleased
 
-- Requirements, architecture, positioning and parity matrix (ARCH 00–07), release plan with ACs for v0.1.0–v1.0.0, `scripts/seed.py` (demo traces and logs over OTLP/protobuf, `--db` per org).
+- Requirements, architecture, positioning and parity matrix (ARCH 00–07), release plan with ACs for v0.1.0–v0.17.0, `scripts/seed.py` (demo traces and logs over OTLP/protobuf, `--db` per org).
+
+### v0.17.0: Hardening (ready)
+
+Added: the API is frozen by golden files (the structure of every route's response, and every route with its method and access level; a change fails a test until the golden file is regenerated on purpose); one supported GreptimeDB, v1.3.0 and newer, logged at start with a warning when older (a run on v1.2.1 failed 11 of 44 live tests); browser security headers on every response (Content-Security-Policy with no inline script, `nosniff`, no framing, no referrer, permissions and opener policies); a written security review (`docs/security-review-0.17.0.md`) with two findings fixed: SQL mode could read grepui's own `grepui_*` tables when an org's database was the metadata database, and the app sent no security headers (ADR 0018). New requirement R-O4.
+
+No schema change, no new dependency, no new flag. Behaviour change: SQL mode, dashboard SQL panels and alert rules refuse any table named `grepui_*`. Limits: the CSP keeps `'unsafe-inline'` for styles; redaction is by name; heavy SQL-mode statements are bounded by timeouts and work groups, not prevented; a 10 M-row load test was started and set aside (not part of this release).
 
 ### v0.16.0: LLM traces, metric-level views (ready)
 
@@ -162,12 +169,6 @@ Verified so far: GreptimeDB OTLP is protobuf-only; table columns of the two OTLP
 
 **Planned, not built yet (newest first):**
 
-### v1.0.0: Launch hardening (planned)
-
-Will add: Golden files for every response shape; Compatibility run on the pinned GreptimeDB and the previous minor; Security review: read-only claim, write allowlist, RBAC route table, SQL mode, redaction; Load test on seeded 10 M spans / 10 M logs recorded in `docs/`.
-
-No new requirement IDs.
-
 ### v0.11.0: Access control, multi-tenancy, SSO and audit (planned)
 
 Will add: Local users, organizations (tenants), roles, sessions; multi-tenant UI with org switcher, branding and org admins; RBAC enforced in the query layer for every endpoint; API tokens and service accounts; OpenID Connect SSO; Audit trail with search.
@@ -204,6 +205,7 @@ Honest ledger of what has actually been run. Updated as releases land.
 | OpenInference spans on trace v2 (JSON2) | spike on v1.3.0: stored with 19 fixed columns (300 indexed messages and a 200 KB prompt in one span), queried with `json_get_*(col, '["key"]')`; grepui's trace list/waterfall/logs work on a v2 table, its span panel and attribute filters do not yet (roadmap LLM track L1) |
 | CI-parity run (fresh `make db-down db-up`, seed, `make test-db`) | green for every live test after the v0.4.0 fixes; it reproduced the v0.3.0 CI failure and found the join bug below |
 | **GreptimeDB v1.2.1: `IN (subquery)`, `EXISTS` and self-joins on a telemetry table return wrong, nondeterministic rows** | verified live (4 / 6 / 5 / 0 for a true 33); no such query is used (ADR 0007); the v0.5.0 dependency self-join is verified correct on v1.3.0 (`ac_0_5_3_dependencies_live`) |
+| Hardening (v0.17.0): golden response shapes for 148 routes and the route table, SQL-mode probe, state-table refusal, security headers | verified in tests (golden gates shown to fail on a tampered shape and a tampered permission), SQL mode probed with 56 hand-written bypass attempts, headers checked on a live server, and a browser pass over ten pages, a trace page and a dashboard with markdown and HTML text panels under the policy with no violations. Not exercised: a second GreptimeDB version (decision: v1.3.0 only), load at 10 M rows |
 | LLM analytics, sessions, users and alerts (v0.16.0) | verified live on GreptimeDB v1.3.0 (every breakdown, total, series, session, turn order, user and both alert rules against numbers computed from a generated OpenInference batch) and in a browser as admin. Not exercised: a real SDK's session ids, the page as a viewer |
 | LLM span views, prices, evaluations, feedback, agent graph, content protection (v0.15.0) | verified live on GreptimeDB v1.3.0 (agent graph of three traces from a generated OpenInference batch equals the graph computed from the spans, edges and call counts) and in 22 offline tests; browser pass as admin. Not exercised: viewer-masked content in a browser, `gen_ai.evaluation.result` from a real SDK |
 | Trace layouts and LLM Connect (v0.14.0): flat and JSON2 trace tables, attribute filters, span panel, Connect headers | verified live on GreptimeDB v1.3.0 (a generated OpenInference batch sent to a v2 table and filtered by model, span kind, a numeric attribute, a substring and the project, each against counts taken from the batch; the Connect headers accepted and a v1 header refused on the same table); the real OpenTelemetry SDK with the OpenInference OpenAI instrumentor sent to a v2 table by hand; in a browser. Not exercised: `arize-phoenix-otel`, a v1 and a v2 table in one organisation's workflow beyond the tests |

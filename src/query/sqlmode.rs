@@ -82,6 +82,7 @@ pub fn check(sql: &str, database: &str) -> Result<(), Reject> {
     // Queries: every table in FROM/JOIN/subqueries/CTEs. SHOW and DESC were checked above, by
     // their own fields (the visitor would misread `SHOW TABLES FROM greptime.public`).
     let mut bad = None;
+    let mut state = None;
     let is_query = matches!(stmt, Statement::Query(_) | Statement::Explain { .. });
     let _ = visit_relations(stmt, |name| {
         if !is_query {
@@ -101,6 +102,10 @@ pub fn check(sql: &str, database: &str) -> Result<(), Reject> {
             [s, _] => (None, Some(s.as_str())),
             _ => (None, None),
         };
+        if parts.last().is_some_and(|t| is_state_table(t)) {
+            state = Some(name.to_string());
+            return ControlFlow::Break(());
+        }
         if catalog.is_some_and(|c| !c.eq_ignore_ascii_case("greptime"))
             || schema.is_some_and(|s| s != database)
         {
@@ -109,6 +114,11 @@ pub fn check(sql: &str, database: &str) -> Result<(), Reject> {
         }
         ControlFlow::<()>::Continue(())
     });
+    if let Some(n) = state {
+        return no(format!(
+            "{n} is one of grepui's own tables, which SQL mode never reads"
+        ));
+    }
     if let Some(n) = bad {
         return no(format!("{n} is outside this org's database ({database})"));
     }
@@ -139,12 +149,22 @@ fn name_in(name: &ObjectName, database: &str) -> bool {
                 .to_string()
         })
         .collect();
+    if parts.last().is_some_and(|t| is_state_table(t)) {
+        return false;
+    }
     match parts.as_slice() {
         [_] => true,
         [schema, _] => schema == database,
         [catalog, schema, _] => catalog.eq_ignore_ascii_case("greptime") && schema == database,
         _ => false,
     }
+}
+
+/// grepui's own state tables (`grepui_*`: users, sessions, tokens, rules, audit of every org). SQL
+/// mode never reads them, whichever database they are in: if an operator points an org at the
+/// metadata database, the database name check alone would let one org read all the others.
+fn is_state_table(table: &str) -> bool {
+    table.to_ascii_lowercase().starts_with("grepui_")
 }
 
 /// `SHOW ... FROM|IN <parent>`: the parent is a database for TABLES and a table for COLUMNS.

@@ -1017,6 +1017,7 @@ pub fn router(state: Shared) -> Router {
         ))
         .fallback(fallback)
         .layer(axum::extract::DefaultBodyLimit::max(MAX_BODY))
+        .layer(axum::middleware::map_response(security_headers))
         .with_state(state)
 }
 
@@ -1051,6 +1052,33 @@ async fn orgs(
 }
 
 /// Unknown `/api/*` is JSON 404; everything else is the embedded UI (R-F3).
+/// The Content-Security-Policy every response carries (v0.17.0). The app is ES modules from its own
+/// origin, inline `style` attributes set by the DOM helper, `data:` icons and SVG charts, and talks
+/// only to its own API; text panels sit in a sandboxed iframe that inherits this policy.
+pub const CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'";
+
+/// Headers that make a browser treat the app as what it is: not sniffed, not framed, no referrer
+/// leaked, no features it does not use. Set only when the handler did not set its own.
+async fn security_headers(mut res: Response) -> Response {
+    let h = res.headers_mut();
+    for (name, value) in [
+        ("content-security-policy", CSP),
+        ("x-content-type-options", "nosniff"),
+        ("x-frame-options", "DENY"),
+        ("referrer-policy", "no-referrer"),
+        (
+            "permissions-policy",
+            "camera=(), microphone=(), geolocation=(), payment=()",
+        ),
+        ("cross-origin-opener-policy", "same-origin"),
+    ] {
+        if !h.contains_key(name) {
+            h.insert(name, header::HeaderValue::from_static(value));
+        }
+    }
+    res
+}
+
 async fn fallback(method: Method, uri: Uri, headers: HeaderMap) -> Response {
     let path = uri.path();
     if path == "/api" || path.starts_with("/api/") {

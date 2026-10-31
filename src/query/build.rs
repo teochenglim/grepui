@@ -10,6 +10,11 @@ pub fn health() -> Q {
     Q::new("health", "SELECT 1 AS ok", vec![])
 }
 
+/// The database's version string, for the start-up check (v0.17.0).
+pub fn db_version() -> Q {
+    Q::new("db_version", "SELECT version() AS version", vec![])
+}
+
 /// GreptimeDB's own list of running statements (v0.12.0).
 pub fn process_list() -> Q {
     Q::new(

@@ -1,0 +1,2384 @@
+{
+  "GET /api/v1/auth/login": {
+    "status": 405,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/auth/logout": {
+    "status": 405,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/auth/me": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "authenticated": "bool",
+        "no_auth": "bool",
+        "kind": "string",
+        "username": "string",
+        "platform_admin": "bool",
+        "orgs": {},
+        "user": "null",
+        "setup_required": "bool",
+        "oidc": "bool"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/auth/oidc/callback": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/auth/oidc/login": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/auth/password": {
+    "status": 405,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/auth/setup": {
+    "status": 405,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/health": {
+    "status": 200,
+    "shape": {
+      "status": "string",
+      "db": "string"
+    }
+  },
+  "GET /api/v1/info": {
+    "status": 200,
+    "shape": {
+      "name": "string",
+      "version": "string"
+    }
+  },
+  "GET /api/v1/orgs": {
+    "status": 200,
+    "shape": {
+      "orgs": {
+        "[]": {
+          "name": "string",
+          "role": "string",
+          "branding": {}
+        }
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/alerts": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/alerts/export": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "grepui_alerts": "int",
+        "alerts": "[]"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/alerts/history": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/alerts/import": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/alerts/info": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "scheduler": "bool",
+        "tick_s": "int",
+        "lease_s": "int",
+        "email": "bool",
+        "kinds": {
+          "[]": "string"
+        },
+        "variables": {
+          "[]": "string"
+        },
+        "default_subject": "string",
+        "default_body": "string",
+        "min_realtime_s": "int",
+        "default_realtime_s": "int"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/alerts/preview": {
+    "status": 400,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/alerts/{id}": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/alerts/{id}/history": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/alerts/{id}/incident": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/alerts/{id}/preview": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/audit": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/branding": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "name": "string"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/catalog": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": {
+          "annotation": "null",
+          "avg_us": "number?",
+          "error_pct": "number",
+          "errors": "int",
+          "first_seen_ms": "int",
+          "last_seen_ms": "int",
+          "p95_us": "number?",
+          "rate_per_s": "number",
+          "requests": "int",
+          "seen": "bool",
+          "service_name": "string",
+          "spans": "int"
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/connect": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "org": "string",
+        "database": "string",
+        "http_base": "string",
+        "endpoints": {
+          "[]": {
+            "content_type": "string",
+            "headers": {
+              "x-greptime-db-name?": "string",
+              "x-greptime-log-table-name???": "string",
+              "x-greptime-pipeline-name???": "string",
+              "x-greptime-trace-table-name???": "string"
+            },
+            "method": "string",
+            "signal": "string",
+            "url": "string"
+          }
+        },
+        "snippets": {
+          "otel_collector": "string",
+          "sdk_env": "string",
+          "prometheus": "string",
+          "check_tables": "string"
+        },
+        "notes": {
+          "[]": "string"
+        },
+        "llm": {
+          "table": "string",
+          "headers": {
+            "x-greptime-db-name": "string",
+            "x-greptime-pipeline-name": "string",
+            "x-greptime-trace-table-name": "string"
+          },
+          "python": "string",
+          "sdk_env": "string",
+          "otel_collector": "string",
+          "notes": {
+            "[]": "string"
+          }
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/dashboards": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/dashboards/export": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "grepui_dashboards": "int",
+        "dashboards": "[]"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/dashboards/import": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/dashboards/move": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/dashboards/{id}": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/dashboards/{id}/export": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/dashboards/{id}/panels/{panel}/data": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/dashboards/{id}/shares": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/dashboards/{id}/shares/{share}": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/dashboards/{id}/variables": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/dependencies": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "nodes": {
+          "[]": {
+            "id": "string",
+            "layer": "int",
+            "row": "int",
+            "x": "int",
+            "y": "int",
+            "calls_in": "int",
+            "calls_out": "int",
+            "errors_in": "int"
+          }
+        },
+        "edges": {
+          "[]": {
+            "from": "string",
+            "to": "string",
+            "calls": "int",
+            "errors": "int",
+            "avg_us": "number",
+            "error_pct": "number",
+            "back": "bool",
+            "self": "bool"
+          }
+        },
+        "width": "int",
+        "height": "int"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/destinations": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/destinations/{id}": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/destinations/{id}/test": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/downtimes": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/downtimes/{id}": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/enrichment": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "tables": "[]",
+        "admin_writes": "bool"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/enrichment/{name}": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/enrichment/{name}/join": {
+    "status": 400,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/folders": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/folders/{id}": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/functions": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/functions/{name}": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/history": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/incidents": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/incidents/{id}": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/incidents/{id}/ack": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/incidents/{id}/resolve": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/ingest/freshness": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "now_ms": "int",
+        "quiet_secs": "int",
+        "lookback_hours": "int",
+        "streams": {
+          "[]": {
+            "age_secs": "int?",
+            "newest_ms": "int?",
+            "state": "string",
+            "stream": "string"
+          }
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/ingest/rate": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "bucket_ms": "int",
+        "buckets": {
+          "[]": {
+            "t": "int",
+            "count": "int"
+          }
+        },
+        "total": "int",
+        "per_minute": "number"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/ingest/services": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": {
+          "service": "string",
+          "last_seen_ms": "int",
+          "age_secs": "int",
+          "spans": "int",
+          "state": "string"
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/llm/breakdown": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": {
+          "grp": "string",
+          "calls": "int",
+          "errors": "int",
+          "error_rate": "number",
+          "p50_ms": "number",
+          "p95_ms": "number",
+          "p99_ms": "number",
+          "avg_ms": "number",
+          "prompt_tokens": "int",
+          "completion_tokens": "int",
+          "total_tokens": "int",
+          "cost": {
+            "reported": "number",
+            "estimated": "number",
+            "total": "number"
+          }
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/llm/content": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "mode": "string"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/llm/feedback": {
+    "status": 400,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/llm/overview": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "totals": {
+          "grp": "null",
+          "calls": "int",
+          "errors": "int",
+          "error_rate": "number",
+          "p50_ms": "number",
+          "p95_ms": "number",
+          "p99_ms": "number",
+          "avg_ms": "number",
+          "prompt_tokens": "int",
+          "completion_tokens": "int",
+          "total_tokens": "int",
+          "cost": {
+            "reported": "number",
+            "estimated": "number",
+            "total": "number"
+          }
+        },
+        "models": {
+          "[]": {
+            "grp": "string",
+            "calls": "int",
+            "errors": "int",
+            "error_rate": "number",
+            "p50_ms": "number",
+            "p95_ms": "number",
+            "p99_ms": "number",
+            "avg_ms": "number",
+            "prompt_tokens": "int",
+            "completion_tokens": "int",
+            "total_tokens": "int",
+            "cost": {
+              "reported": "number",
+              "estimated": "number",
+              "total": "number"
+            }
+          }
+        },
+        "series": {
+          "[]": {
+            "t": "int",
+            "calls": "int",
+            "errors": "int",
+            "p95_ms": "number",
+            "prompt_tokens": "int",
+            "completion_tokens": "int",
+            "cost": "number"
+          }
+        },
+        "bucket_ms": "int",
+        "priced_models": "[]"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/llm/prices": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/llm/sessions": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": {
+          "session_id": "string",
+          "traces": "int",
+          "spans": "int",
+          "llm_calls": "int",
+          "errors": "int",
+          "prompt_tokens": "int",
+          "completion_tokens": "int",
+          "total_tokens": "int",
+          "cost": "number",
+          "first_ms": "int",
+          "last_ms": "int",
+          "user": "string",
+          "users": "int",
+          "sessions": "null"
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/llm/sessions/{id}": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "session_id": "string",
+        "turns": {
+          "[]": {
+            "trace_id": "string",
+            "start_ms": "int",
+            "duration_us": "int",
+            "spans": "int",
+            "errors": "int",
+            "llm_calls": "int",
+            "prompt_tokens": "int",
+            "completion_tokens": "int",
+            "total_tokens": "int",
+            "cost": "number",
+            "input.value": "string",
+            "output.value": "string"
+          }
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/llm/users": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": {
+          "user_id": "string",
+          "traces": "int",
+          "spans": "int",
+          "llm_calls": "int",
+          "errors": "int",
+          "prompt_tokens": "int",
+          "completion_tokens": "int",
+          "total_tokens": "int",
+          "cost": "number",
+          "first_ms": "int",
+          "last_ms": "int",
+          "user": "null",
+          "users": "null",
+          "sessions": "int"
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/logs": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": {
+          "timestamp": "int",
+          "ts_ns": "string",
+          "severity_text": "string",
+          "severity_number": "int",
+          "body": "string",
+          "trace_id": "string",
+          "span_id": "string",
+          "scope_name": "string",
+          "log_attributes": {
+            "http.method": "string"
+          },
+          "resource_attributes": {
+            "service.name": "string"
+          }
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/logs/around": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "pivot_ns": "string",
+        "rows": {
+          "[]": {
+            "timestamp": "int",
+            "ts_ns": "string",
+            "severity_text": "string",
+            "severity_number": "int",
+            "body": "string",
+            "trace_id": "string",
+            "span_id": "string",
+            "scope_name": "string",
+            "log_attributes": {
+              "http.method": "string"
+            },
+            "resource_attributes": {
+              "service.name": "string"
+            }
+          }
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/logs/export": {
+    "status": 200,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/logs/fields": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": {
+          "name": "string",
+          "type": "string",
+          "role": "string",
+          "quick": "bool",
+          "attributes": "bool"
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/logs/fields/{field}/values": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": {
+          "value": "string",
+          "count": "int"
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/logs/histogram": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "bucket_ms": "int",
+        "buckets": {
+          "[]": {
+            "t": "int",
+            "count": "int"
+          }
+        },
+        "total": "int"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/logs/record": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": {
+          "timestamp": "int",
+          "ts_ns": "string",
+          "severity_text": "string",
+          "severity_number": "int",
+          "body": "string",
+          "trace_id": "string",
+          "span_id": "string",
+          "scope_name": "string",
+          "log_attributes": {
+            "http.method": "string"
+          },
+          "resource_attributes": {
+            "service.name": "string"
+          }
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/members": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/members/{user}": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/metrics": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": {
+          "name": "string",
+          "kind": "string"
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/metrics/query": {
+    "status": 400,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/metrics/{name}/labels": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/pipelines": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "pipelines": "[]",
+        "admin_writes": "bool"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/pipelines/dry-run": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/pipelines/{name}": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/playlists": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/playlists/{id}": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/playlists/{id}/now": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/public/{token}": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/public/{token}/panels/{panel}/data": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/public/{token}/variables": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/queries": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "running": "[]",
+        "other": "[]"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/queries/stats": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "slowest": {
+          "[]": {
+            "user": "string",
+            "tag": "string",
+            "count": "int",
+            "errors": "int",
+            "avg_ms": "int",
+            "max_ms": "int",
+            "total_ms": "int"
+          }
+        },
+        "most_frequent": {
+          "[]": {
+            "user": "string",
+            "tag": "string",
+            "count": "int",
+            "errors": "int",
+            "avg_ms": "int",
+            "max_ms": "int",
+            "total_ms": "int"
+          }
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/queries/{id}/cancel": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/redaction": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "rules": "[]",
+        "role": "string",
+        "admin_writes": "bool"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/redaction/{id}": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/reports": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/reports/{id}": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/reports/{id}/history": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/reports/{id}/preview": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/reports/{id}/run": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/retention": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "streams": {
+          "[]": {
+            "stream": "string",
+            "table": "string",
+            "exists": "bool",
+            "ttl": "string",
+            "ttl_secs": "null"
+          }
+        },
+        "admin_writes": "bool",
+        "advice": "null"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/retention/{stream}": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/retention/{stream}/preview": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "stream": "string",
+        "table": "string",
+        "ttl": "string",
+        "cutoff_ms": "int",
+        "total": "int",
+        "would_expire": "int",
+        "would_keep": "int"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/rollups": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "templates": {
+          "[]": {
+            "template": "string",
+            "title": "string",
+            "source": "string",
+            "sink": "string",
+            "flow": "string",
+            "sink_exists": "bool",
+            "flow_exists": "bool",
+            "created_ms": "null",
+            "rows": "int",
+            "newest_ms": "int"
+          }
+        },
+        "admin_writes": "bool"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/rollups/{template}": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/rollups/{template}/backfill": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/rum/errors": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/rum/overview": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/rum/sessions": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/rum/sites": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/rum/status": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "installed": "bool",
+        "table": "string",
+        "missing": {
+          "[]": "string"
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/rum/vitals": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/services": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": {
+          "avg_us": "number?",
+          "error_pct": "number",
+          "errors": "int",
+          "first_seen_ms": "int",
+          "last_seen_ms": "int",
+          "p95_us": "number?",
+          "rate_per_s": "number",
+          "requests": "int",
+          "service_name": "string",
+          "spans": "int"
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/services/{service}": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "service": "string",
+        "summary": {
+          "service_name": "string",
+          "first_seen_ms": "int",
+          "last_seen_ms": "int",
+          "spans": "int",
+          "requests": "int",
+          "errors": "int",
+          "avg_us": "number",
+          "p95_us": "number",
+          "rate_per_s": "number",
+          "error_pct": "number"
+        },
+        "bucket_ms": "int",
+        "series": {
+          "[]": {
+            "bucket_ms": "int",
+            "requests": "int",
+            "errors": "int",
+            "avg_us": "number",
+            "p95_us": "number"
+          }
+        },
+        "operations": {
+          "[]": {
+            "operation": "string",
+            "requests": "int",
+            "errors": "int",
+            "avg_us": "number",
+            "p95_us": "number"
+          }
+        },
+        "annotation": "null"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/services/{service}/annotation": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/sources": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": {
+          "name": "string",
+          "health": {
+            "ok": "bool",
+            "ms": "int"
+          }
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/sql": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "columns": {
+          "[]": "string"
+        },
+        "rows": {
+          "[]": {
+            "b": "int",
+            "a": "int"
+          }
+        },
+        "truncated": "bool"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/streams": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": {
+          "name": "string",
+          "kind": "string",
+          "table_type": "string",
+          "engine": "string",
+          "rows_estimate": "int"
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/streams/{name}": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "name": "string",
+        "time_index": "null",
+        "columns": {
+          "[]": {
+            "name": "string",
+            "type": "string",
+            "role": "string"
+          }
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/streams/{name}/ddl": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "name": "string",
+        "parsed": {
+          "time_index": "string",
+          "primary_key": "[]",
+          "indexes": {
+            "[]": {
+              "[]": "string"
+            }
+          },
+          "partition_columns": "[]",
+          "ttl": "null",
+          "append_mode": "bool"
+        },
+        "ddl": "string"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/streams/{name}/info": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "name": "string",
+        "kind": "string",
+        "engine": "string",
+        "rows_estimate": "int",
+        "data_bytes": "int",
+        "index_bytes": "int",
+        "options": "string"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/streams/{name}/sample": {
+    "status": 400,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/streams/{name}/stats": {
+    "status": 400,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/tokens": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/tokens/{id}": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/orgs/{org}/traces": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": {
+          "trace_id": "string",
+          "start_ms": "int",
+          "duration_us": "int",
+          "spans": "int",
+          "services": "int",
+          "errors": "int",
+          "root_service": "string",
+          "root_operation": "string"
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/traces/histogram": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "bucket_ms": "int",
+        "buckets": {
+          "[]": {
+            "t": "int",
+            "count": "int"
+          }
+        },
+        "total": "int"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/traces/layout": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "layout": "string",
+        "table": "string",
+        "columns": "int"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/traces/scatter": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "points": {
+          "[]": {
+            "trace_id": "string",
+            "start_ms": "int",
+            "duration_us": "int",
+            "spans": "int",
+            "services": "int",
+            "errors": "int",
+            "root_service": "string",
+            "root_operation": "string"
+          }
+        },
+        "capped": "bool",
+        "max": "int"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/traces/services": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": "string"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/traces/{id}/agent-graph": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "nodes": "[]",
+        "edges": "[]",
+        "map": {
+          "nodes": "[]",
+          "edges": "[]",
+          "width": "int",
+          "height": "int"
+        },
+        "trace_id": "string",
+        "truncated": "bool"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/traces/{trace_id}": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "trace": {
+          "trace_id": "string",
+          "start_ms": "int",
+          "start_ns": "string",
+          "duration_us": "int",
+          "spans": "int",
+          "services": {
+            "[]": "string"
+          },
+          "errors": "int",
+          "truncated": "bool",
+          "llm": "null"
+        },
+        "spans": {
+          "[]": {
+            "attributes": {
+              "http.route": "string",
+              "http.status_code": "int"
+            },
+            "depth": "int",
+            "duration_us": "int",
+            "error": "bool",
+            "kind": "string",
+            "message": "string",
+            "name": "string",
+            "offset_us": "int",
+            "parent_id": "string?",
+            "resource": {
+              "service.version": "string"
+            },
+            "scope": "string",
+            "service": "string",
+            "span_id": "string",
+            "start_ns": "string",
+            "status": "string"
+          }
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/traces/{trace_id}/flame": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "trace_id": "string",
+        "root": {
+          "name": "string",
+          "service": "string",
+          "count": "int",
+          "total_us": "int",
+          "self_us": "int",
+          "errors": "int",
+          "children": {
+            "[]": {
+              "name": "string",
+              "service": "string",
+              "count": "int",
+              "total_us": "int",
+              "self_us": "int",
+              "errors": "int",
+              "children": {
+                "[]": {
+                  "name": "string",
+                  "service": "string",
+                  "count": "int",
+                  "total_us": "int",
+                  "self_us": "int",
+                  "errors": "int",
+                  "children": "[]"
+                }
+              }
+            }
+          }
+        },
+        "truncated": "bool"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/traces/{trace_id}/logs": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": {
+          "timestamp": "int",
+          "ts_ns": "string",
+          "severity_text": "string",
+          "severity_number": "int",
+          "body": "string",
+          "trace_id": "string",
+          "span_id": "string",
+          "scope_name": "string",
+          "log_attributes": {
+            "http.method": "string"
+          },
+          "resource_attributes": {
+            "service.name": "string"
+          }
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/views": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/views/{id}": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "GET /api/v1/orgs/{org}/workgroups": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": {
+          "role": "string",
+          "limits": {
+            "max_concurrent": "int",
+            "timeout_secs": "int",
+            "max_rows": "int",
+            "max_window_hours": "int"
+          }
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/orgs/{org}/workgroups/{role}": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/platform/audit": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/platform/orgs": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": {
+          "name": "string",
+          "database": "string",
+          "traces_table": "string",
+          "logs_table": "string"
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/platform/orgs/{org}": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/platform/sources": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "[]": {
+          "name": "string",
+          "enabled": "bool",
+          "min_role": "string",
+          "health": {
+            "ok": "bool",
+            "ms": "int"
+          }
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/platform/sources/{name}": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /api/v1/platform/users": {
+    "status": 200,
+    "shape": {
+      "data": "[]",
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": "[]",
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "GET /api/v1/platform/users/{user}": {
+    "status": 405,
+    "shape": "string"
+  },
+  "GET /healthz": {
+    "status": 200,
+    "shape": "string"
+  },
+  "GET /metrics": {
+    "status": 200,
+    "shape": "string"
+  },
+  "POST /api/v1/orgs/{org}/alerts": {
+    "status": 201,
+    "shape": {
+      "data": {
+        "id": "string",
+        "name": "string",
+        "owner": "string",
+        "created_ms": "int",
+        "updated_ms": "int",
+        "spec": {
+          "name": "string",
+          "enabled": "bool",
+          "description": "string",
+          "folder": "string",
+          "kind": "string",
+          "query": {
+            "kind": "string",
+            "text": "string",
+            "builder": "null",
+            "llm": "null"
+          },
+          "condition": {
+            "op": "string",
+            "threshold": "number",
+            "compare": "null"
+          },
+          "schedule": {
+            "every_s": "int",
+            "cron": "null"
+          },
+          "lookback_s": "int",
+          "cooldown_s": "int",
+          "budget_ms": "null",
+          "dedup": {
+            "fields": "[]",
+            "window_s": "int"
+          },
+          "destinations": "[]",
+          "template": {
+            "subject": "string",
+            "body": "string"
+          },
+          "composite": "null",
+          "anomaly": "null",
+          "open_incident": "bool"
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "POST /api/v1/orgs/{org}/destinations": {
+    "status": 201,
+    "shape": {
+      "data": {
+        "id": "string",
+        "name": "string",
+        "owner": "string",
+        "created_ms": "int",
+        "updated_ms": "int",
+        "spec": {
+          "name": "string",
+          "kind": "string",
+          "url": "string",
+          "to": "[]"
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "POST /api/v1/orgs/{org}/redaction": {
+    "status": 201,
+    "shape": {
+      "data": {
+        "id": "string",
+        "rule": {
+          "field": "string",
+          "mask": "string",
+          "exempt_roles": "[]"
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "PUT /api/v1/orgs/{org}/llm/content": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "mode": "string"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "PUT /api/v1/orgs/{org}/llm/feedback": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "id": "string",
+        "trace_id": "string",
+        "span_id": "null",
+        "rating": "string",
+        "score": "null",
+        "label": "string",
+        "note": "string",
+        "author": "string",
+        "created_ms": "int",
+        "updated_ms": "int"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "PUT /api/v1/orgs/{org}/llm/prices": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "model": "string",
+        "prompt_per_1m": "number",
+        "completion_per_1m": "number"
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  },
+  "PUT /api/v1/orgs/{org}/workgroups/{role}": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "role": "string",
+        "limits": {
+          "max_concurrent": "int",
+          "timeout_secs": "int",
+          "max_rows": "int",
+          "max_window_hours": "int"
+        }
+      },
+      "meta": {
+        "query": "string",
+        "sql": "string",
+        "binds": {
+          "[]": "string"
+        },
+        "ms": "int",
+        "rows": "int",
+        "source": "string"
+      }
+    }
+  }
+}

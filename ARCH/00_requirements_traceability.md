@@ -88,6 +88,7 @@ Parity with the reference platform is tracked in [07_parity_matrix.md](07_parity
 | R-U1 | RUM | RUM view over GrepRUM tables: page views, web vitals, JS errors with stack traces, sessions list. Session replay is not supported |
 | R-O1 | Operate | Short-lived result cache with single-flight, keyed by statement, binds and role; bounded memory |
 | R-O2 | Operate | `/metrics` (Prometheus text) for grepui itself: request counts, DB latency, cache hits, alert evaluations |
+| R-O4 | Operate | Every response carries browser security headers (Content-Security-Policy with no inline script, `nosniff`, no framing, no referrer, a locked-down permissions policy), and the cookie is HttpOnly and SameSite=Strict |
 | R-O3 | Operate | Graceful shutdown, connection pool limits, and `--read-only-user` check at startup that warns if the DB account can write |
 | R-AI1 | LLM | The traces table layout (flat trace v1 or JSON2 trace v2) is detected, and filters, trace detail, histogram and scatter work on both; attribute keys are bound parameters |
 | R-AI2 | LLM | The Connect page tells LLM SDKs (OpenInference, OTel GenAI) how to send to a trace v2 table: headers, Python, environment and collector snippets, and the notes a user needs (separate table, privacy, size) |

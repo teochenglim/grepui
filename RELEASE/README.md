@@ -17,7 +17,8 @@ The roll-up and changelog live in [`../RELEASE.md`](../RELEASE.md). One file per
 | [v0.11.0](v0.11.0.md) | Access control, multi-tenancy, SSO and audit | D2 D3 | a viewer cannot read another org's streams or write state; SSO login maps claims to a role; every action appears in the audit table | 0.10 |
 | [v0.12.0](v0.12.0.md) | Query management, work groups and federation | D3 | a quota stops an over-limit query before it runs; a running query is cancelled; two sources merge by time | 0.11 |
 | [v0.13.0](v0.13.0.md) | Reports, RUM view and operate | D3 D7 | a scheduled report arrives by email; RUM page renders from GrepRUM tables; two identical concurrent queries hit the DB once | 0.12 |
-| [v1.0.0](v1.0.0.md) | Launch hardening | all | API shapes frozen; two GreptimeDB versions green; security review recorded | 0.13 |
+| [v0.17.0](v0.17.0.md) | Hardening | all | API shapes frozen by golden files; GreptimeDB v1.3.0 is the one supported version, checked at start-up; security review recorded | 0.16 |
+| [v1.0.0](v1.0.0.md) | Better than the reference platform, shown by evidence | all | every comparison backed by a repo test or measurement; gap list closed; every ADR re-read (vision only) | 0.17 |
 
 ## Per-release workflow
 
@@ -30,4 +31,4 @@ The roll-up and changelog live in [`../RELEASE.md`](../RELEASE.md). One file per
 
 ## Versioning
 
-SemVer. `0.x` minors map to the table above; patches (`0.x.y`) are fixes with no AC change and get a short `RELEASE/v0.x.y.md`. `1.0.0` freezes the `/api/v1/*` shapes.
+SemVer. `0.x` minors map to the table above; patches (`0.x.y`) are fixes with no AC change and get a short `RELEASE/v0.x.y.md`. `0.17.0` freezes the `/api/v1/*` shapes with golden files. `1.0.0` is the evidence release (vision only for now).
