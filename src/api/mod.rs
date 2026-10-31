@@ -1,5 +1,6 @@
 //! The typed REST API (`/api/v1`). Every data route is org-scoped (R-F5).
 
+pub mod alerts;
 pub mod connect;
 pub mod dashboards;
 pub mod health;
@@ -43,6 +44,8 @@ pub struct AppState {
     pub ft_cache: std::sync::Mutex<std::collections::HashMap<String, (std::time::Instant, bool)>>,
     /// Columns of each org's traces table (flat attribute columns included), cached briefly.
     pub cols_cache: ColsCache,
+    /// Delivers alert notifications (webhook, SMTP); a fake in tests.
+    pub sender: Arc<dyn crate::alerts::notify::Sender>,
 }
 
 pub type Shared = Arc<AppState>;
@@ -89,6 +92,17 @@ impl AppState {
         writer: Arc<dyn Writer>,
         clock: Clock,
     ) -> anyhow::Result<Shared> {
+        let sender = Arc::new(crate::alerts::notify::NetSender::from_config(&cfg));
+        Self::with_sender(cfg, reader, writer, clock, sender)
+    }
+
+    pub fn with_sender(
+        cfg: Config,
+        reader: Arc<dyn Reader>,
+        writer: Arc<dyn Writer>,
+        clock: Clock,
+        sender: Arc<dyn crate::alerts::notify::Sender>,
+    ) -> anyhow::Result<Shared> {
         cfg.validate()?;
         let orgs = Orgs::from_config(&cfg)?;
         Ok(Arc::new(AppState {
@@ -99,6 +113,7 @@ impl AppState {
             clock,
             ft_cache: Default::default(),
             cols_cache: Default::default(),
+            sender,
         }))
     }
 
@@ -271,6 +286,25 @@ pub const ROUTES: &[&str] = &[
     "/api/v1/orgs/{org}/retention",
     "/api/v1/orgs/{org}/retention/{stream}",
     "/api/v1/orgs/{org}/retention/{stream}/preview",
+    "/api/v1/orgs/{org}/alerts",
+    "/api/v1/orgs/{org}/alerts/info",
+    "/api/v1/orgs/{org}/alerts/preview",
+    "/api/v1/orgs/{org}/alerts/export",
+    "/api/v1/orgs/{org}/alerts/import",
+    "/api/v1/orgs/{org}/alerts/history",
+    "/api/v1/orgs/{org}/alerts/{id}",
+    "/api/v1/orgs/{org}/alerts/{id}/preview",
+    "/api/v1/orgs/{org}/alerts/{id}/history",
+    "/api/v1/orgs/{org}/alerts/{id}/incident",
+    "/api/v1/orgs/{org}/destinations",
+    "/api/v1/orgs/{org}/destinations/{id}",
+    "/api/v1/orgs/{org}/destinations/{id}/test",
+    "/api/v1/orgs/{org}/downtimes",
+    "/api/v1/orgs/{org}/downtimes/{id}",
+    "/api/v1/orgs/{org}/incidents",
+    "/api/v1/orgs/{org}/incidents/{id}",
+    "/api/v1/orgs/{org}/incidents/{id}/ack",
+    "/api/v1/orgs/{org}/incidents/{id}/resolve",
     "/api/v1/orgs/{org}/metrics",
     "/api/v1/orgs/{org}/metrics/query",
     "/api/v1/orgs/{org}/metrics/{name}/labels",
@@ -311,6 +345,20 @@ pub const WRITE_ROUTES: &[(&str, &str)] = &[
     ("POST", "/api/v1/orgs/{org}/rollups/{template}/backfill"),
     ("DELETE", "/api/v1/orgs/{org}/rollups/{template}"),
     ("PUT", "/api/v1/orgs/{org}/retention/{stream}"),
+    ("POST", "/api/v1/orgs/{org}/alerts"),
+    ("POST", "/api/v1/orgs/{org}/alerts/import"),
+    ("PUT", "/api/v1/orgs/{org}/alerts/{id}"),
+    ("DELETE", "/api/v1/orgs/{org}/alerts/{id}"),
+    ("POST", "/api/v1/orgs/{org}/alerts/{id}/incident"),
+    ("POST", "/api/v1/orgs/{org}/destinations"),
+    ("PUT", "/api/v1/orgs/{org}/destinations/{id}"),
+    ("DELETE", "/api/v1/orgs/{org}/destinations/{id}"),
+    ("POST", "/api/v1/orgs/{org}/destinations/{id}/test"),
+    ("POST", "/api/v1/orgs/{org}/downtimes"),
+    ("PUT", "/api/v1/orgs/{org}/downtimes/{id}"),
+    ("DELETE", "/api/v1/orgs/{org}/downtimes/{id}"),
+    ("POST", "/api/v1/orgs/{org}/incidents/{id}/ack"),
+    ("POST", "/api/v1/orgs/{org}/incidents/{id}/resolve"),
     ("PUT", "/api/v1/orgs/{org}/services/{service}/annotation"),
     ("DELETE", "/api/v1/orgs/{org}/services/{service}/annotation"),
 ];
@@ -462,6 +510,75 @@ pub fn router(state: Shared) -> Router {
         .route(
             "/api/v1/orgs/{org}/retention/{stream}/preview",
             get(storage::retention_preview),
+        )
+        .route(
+            "/api/v1/orgs/{org}/alerts",
+            get(alerts::alert_list).post(alerts::alert_create),
+        )
+        .route("/api/v1/orgs/{org}/alerts/info", get(alerts::info))
+        .route(
+            "/api/v1/orgs/{org}/alerts/preview",
+            get(alerts::preview_draft),
+        )
+        .route("/api/v1/orgs/{org}/alerts/export", get(alerts::export_all))
+        .route(
+            "/api/v1/orgs/{org}/alerts/import",
+            axum::routing::post(alerts::import),
+        )
+        .route(
+            "/api/v1/orgs/{org}/alerts/history",
+            get(alerts::history_all),
+        )
+        .route(
+            "/api/v1/orgs/{org}/alerts/{id}",
+            get(alerts::alert_get)
+                .put(alerts::alert_update)
+                .delete(alerts::alert_delete),
+        )
+        .route(
+            "/api/v1/orgs/{org}/alerts/{id}/preview",
+            get(alerts::preview_saved),
+        )
+        .route(
+            "/api/v1/orgs/{org}/alerts/{id}/history",
+            get(alerts::history_one),
+        )
+        .route(
+            "/api/v1/orgs/{org}/alerts/{id}/incident",
+            axum::routing::post(alerts::incident_from_alert),
+        )
+        .route(
+            "/api/v1/orgs/{org}/destinations",
+            get(alerts::dest_list).post(alerts::dest_create),
+        )
+        .route(
+            "/api/v1/orgs/{org}/destinations/{id}",
+            axum::routing::put(alerts::dest_update).delete(alerts::dest_delete),
+        )
+        .route(
+            "/api/v1/orgs/{org}/destinations/{id}/test",
+            axum::routing::post(alerts::dest_test),
+        )
+        .route(
+            "/api/v1/orgs/{org}/downtimes",
+            get(alerts::down_list).post(alerts::down_create),
+        )
+        .route(
+            "/api/v1/orgs/{org}/downtimes/{id}",
+            axum::routing::put(alerts::down_update).delete(alerts::down_delete),
+        )
+        .route("/api/v1/orgs/{org}/incidents", get(alerts::incident_list))
+        .route(
+            "/api/v1/orgs/{org}/incidents/{id}",
+            get(alerts::incident_get),
+        )
+        .route(
+            "/api/v1/orgs/{org}/incidents/{id}/ack",
+            axum::routing::post(alerts::incident_ack),
+        )
+        .route(
+            "/api/v1/orgs/{org}/incidents/{id}/resolve",
+            axum::routing::post(alerts::incident_resolve),
         )
         .route("/api/v1/orgs/{org}/metrics", get(metrics::names))
         .route("/api/v1/orgs/{org}/metrics/query", get(metrics::query))

@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 
 pub mod admin;
+pub mod alerts;
 pub mod api;
 pub mod config;
 pub mod dash;

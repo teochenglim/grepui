@@ -176,6 +176,43 @@ pub async fn seed_demo_dashboard(reader: &SqlxReader, meta_db: &str, org: &str) 
     Ok(())
 }
 
+/// The alert the playground adds: it counts error logs per service over the last 10 minutes and
+/// has no destination, so it only shows in the list, the history and as an incident.
+pub const DEMO_ALERT: &str = r#"{
+  "name": "Error logs per service", "kind": "scheduled", "folder": "demo", "open_incident": true,
+  "description": "More than 3 ERROR logs from one service in 10 minutes",
+  "query": {"kind": "sql", "text": "SELECT json_get_string(resource_attributes, '[\"service.name\"]') AS service_name, count(*) AS n FROM opentelemetry_logs WHERE severity_text = 'ERROR' AND timestamp >= $__from AND timestamp < $__to GROUP BY 1 ORDER BY 1"},
+  "condition": {"op": ">", "threshold": 3}, "lookback_s": 600, "schedule": {"every_s": 30},
+  "dedup": {"fields": ["service_name"], "window_s": 900}
+}"#;
+
+/// Create the demo alert if the org has no alerts. State-store writes only.
+pub async fn seed_demo_alert(reader: &SqlxReader, meta_db: &str, org: &str) -> Result<()> {
+    use crate::store::{build, check_write};
+    let (rows, _) = crate::query::run(reader, build::item_list(meta_db, org, "alert")?).await?;
+    if !rows.is_empty() {
+        return Ok(());
+    }
+    let rule = crate::alerts::parse_rule(&serde_json::from_str(DEMO_ALERT)?)
+        .map_err(|e| anyhow::anyhow!("demo alert: {}", e.1))?;
+    let now = (now_ns() / 1_000_000) as i64;
+    let row = build::ItemRow {
+        item_id: format!("{:016x}", rand::random::<u64>()),
+        name: rule.name.clone(),
+        spec: serde_json::to_string(&rule)?,
+        owner: crate::store::LOCAL_USER.into(),
+        created_ms: now,
+        updated_ms: now,
+        deleted: false,
+    };
+    let q = build::item_put(meta_db, org, "alert", &row)?;
+    check_write(&q, meta_db)?;
+    crate::query::Writer::exec(reader, &q)
+        .await
+        .map_err(|e| anyhow::anyhow!("could not create the demo alert: {}", e.detail()))?;
+    Ok(())
+}
+
 /// Everything before serving: wait, guard, seed, start the live trickle.
 pub async fn prepare(cfg: &Config, o: &Opts) -> Result<()> {
     cfg.validate()?;
@@ -194,6 +231,11 @@ pub async fn prepare(cfg: &Config, o: &Opts) -> Result<()> {
         seed_demo_dashboard(reader.as_ref(), &cfg.meta_database, crate::org::DEFAULT_ORG).await
     {
         tracing::warn!(error = %e, "playground: no demo dashboard");
+    }
+    if let Err(e) =
+        seed_demo_alert(reader.as_ref(), &cfg.meta_database, crate::org::DEFAULT_ORG).await
+    {
+        tracing::warn!(error = %e, "playground: no demo alert");
     }
     let db = cfg.database()?;
     let present = has_traces(reader.as_ref(), &db, &cfg.traces_table).await;

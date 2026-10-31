@@ -39,6 +39,20 @@ pub struct Config {
     /// the stand-in for an admin role until access control (v0.11.0).
     #[arg(long, env = "GREPUI_ADMIN_WRITES")]
     pub admin_writes: bool,
+    /// Do not run the alert scheduler in this process (a UI-only replica).
+    #[arg(long, env = "GREPUI_NO_ALERTS")]
+    pub no_alerts: bool,
+    /// SMTP relay for alert email, host:port. Plain SMTP, no TLS and no login: a relay on a
+    /// trusted network (ADR 0010). Without it, email destinations report an error.
+    #[arg(long, env = "GREPUI_SMTP")]
+    pub smtp: Option<String>,
+    /// Sender address of alert email.
+    #[arg(
+        long,
+        env = "GREPUI_SMTP_FROM",
+        default_value = "grepui@localhost.localdomain"
+    )]
+    pub smtp_from: String,
     /// Per-query timeout in seconds.
     #[arg(long, env = "GREPUI_QUERY_TIMEOUT_SECS", default_value_t = 30)]
     pub query_timeout_secs: u64,
@@ -54,6 +68,9 @@ impl Default for Config {
             logs_table: "opentelemetry_logs".into(),
             meta_database: "grepui".into(),
             admin_writes: false,
+            no_alerts: false,
+            smtp: None,
+            smtp_from: "grepui@localhost.localdomain".into(),
             query_timeout_secs: 30,
         }
     }
@@ -91,6 +108,10 @@ impl Config {
                 self.meta_database
             )
         })?;
+        if let Some(a) = &self.smtp {
+            crate::alerts::notify::Smtp::parse(a, &self.smtp_from)
+                .map_err(|e| anyhow::anyhow!("--smtp: {e}"))?;
+        }
         if self.query_timeout_secs == 0 || self.query_timeout_secs > 600 {
             anyhow::bail!("--query-timeout-secs must be between 1 and 600");
         }

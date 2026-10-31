@@ -322,6 +322,9 @@ pub struct MemStore {
     pub folders: Mutex<HashMap<(String, String), Vec<Bind>>>,
     pub dashes: Mutex<HashMap<(String, String), Vec<Bind>>>,
     pub shares: Mutex<HashMap<(String, String), Vec<Bind>>>,
+    /// Alert items by (org, kind, item_id): the binds of the last `alert_item_put`.
+    pub items: Mutex<HashMap<(String, String, String), Vec<Bind>>>,
+    pub alert_history: Mutex<Vec<Vec<Bind>>>,
     /// Every query the reader saw (panel data included).
     pub seen: Mutex<Vec<Q>>,
     /// Answers for queries that are not state-store reads; `sample_db` when unset.
@@ -399,6 +402,45 @@ impl Reader for MemStore {
                     .collect();
                 rows.sort_by_key(|(u, _)| std::cmp::Reverse(*u));
                 rows.into_iter().map(|(_, v)| v).collect()
+            }
+            "alert_item_list" | "alert_item_get" => {
+                let (org, kind) = (s_of(&q.binds[0]), s_of(&q.binds[1]));
+                let id = q.binds.get(2).map(s_of);
+                let mut rows: Vec<(String, String, Value)> = self
+                    .items
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|((o, k, i), b)| {
+                        *o == org && *k == kind && b[8] == Bind::Bool(false) && id.as_ref().is_none_or(|x| x == i)
+                    })
+                    .map(|((_, _, i), b)| (s_of(&b[3]), i.clone(), json!({"item_id": i, "name": s_of(&b[3]), "spec": s_of(&b[4]), "owner": s_of(&b[5]), "created_ms": i_of(&b[6]), "updated_ms": i_of(&b[7])})))
+                    .collect();
+                rows.sort_by(|a, b| (&a.0, &a.1).cmp(&(&b.0, &b.1)));
+                rows.into_iter().map(|(_, _, v)| v).collect()
+            }
+            "alert_history_list" => {
+                let org = s_of(&q.binds[0]);
+                let alert = q.sql.contains("`alert_id` = ?").then(|| s_of(&q.binds[1]));
+                let mut rows: Vec<(i64, Value)> = self
+                    .alert_history
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|b| s_of(&b[0]) == org && alert.as_ref().is_none_or(|a| s_of(&b[1]) == *a))
+                    .map(|b| {
+                        let at = parse_ts(&s_of(&b[5]));
+                        (at, json!({"alert_id": s_of(&b[1]), "state": s_of(&b[2]), "outcome": s_of(&b[3]), "detail": s_of(&b[4]), "at_ms": at}))
+                    })
+                    .collect();
+                rows.sort_by_key(|(t, _)| std::cmp::Reverse(*t));
+                let limit = q
+                    .sql
+                    .rsplit("LIMIT ")
+                    .next()
+                    .and_then(|n| n.trim().parse::<usize>().ok())
+                    .unwrap_or(500);
+                rows.into_iter().take(limit).map(|(_, v)| v).collect()
             }
             "folder_list" => {
                 let org = s_of(&q.binds[0]);
@@ -518,6 +560,13 @@ impl Writer for MemStore {
                     .insert((s_of(&q.binds[0]), s_of(&q.binds[1])), q.binds.clone());
             }
             "history_add" => self.history.lock().unwrap().push(q.binds.clone()),
+            "alert_item_put" => {
+                self.items.lock().unwrap().insert(
+                    (s_of(&q.binds[0]), s_of(&q.binds[1]), s_of(&q.binds[2])),
+                    q.binds.clone(),
+                );
+            }
+            "alert_history_put" => self.alert_history.lock().unwrap().push(q.binds.clone()),
             "rollup_backfill" => return Ok(5),
             "folder_put" => {
                 self.folders
@@ -620,4 +669,50 @@ pub async fn send_text(app: &Router, method: Method, uri: &str, body: &str) -> R
         headers: parts.headers,
         body: body.collect().await.unwrap().to_bytes().to_vec(),
     }
+}
+
+/// Records every notification; fails when told to.
+#[derive(Default)]
+pub struct Rec {
+    pub sent: Mutex<Vec<(String, grepui::alerts::notify::Message)>>,
+    pub fail: Mutex<Option<String>>,
+}
+
+#[async_trait]
+impl grepui::alerts::notify::Sender for Rec {
+    async fn send(
+        &self,
+        to: &grepui::alerts::Destination,
+        m: &grepui::alerts::notify::Message,
+    ) -> Result<(), String> {
+        if let Some(e) = self.fail.lock().unwrap().clone() {
+            return Err(e);
+        }
+        self.sent.lock().unwrap().push((to.name.clone(), m.clone()));
+        Ok(())
+    }
+}
+
+impl Rec {
+    pub fn count(&self) -> usize {
+        self.sent.lock().unwrap().len()
+    }
+}
+
+/// An app and its state sharing a store, a clock and a recording sender.
+pub fn alert_app(
+    store: &Arc<MemStore>,
+    clock: &Arc<AtomicI64>,
+    rec: &Arc<Rec>,
+) -> (Router, grepui::api::Shared) {
+    let c = clock.clone();
+    let state = AppState::with_sender(
+        Config::default(),
+        store.clone(),
+        store.clone(),
+        Arc::new(move || c.load(Ordering::SeqCst)),
+        rec.clone(),
+    )
+    .expect("state");
+    (router(state.clone()), state)
 }

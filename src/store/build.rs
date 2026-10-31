@@ -412,3 +412,138 @@ pub fn share_put(meta_db: &str, org_name: &str, s: &ShareRow) -> Result<Q> {
         ],
     ))
 }
+
+// ---- alerting (R-A1 – R-A8) ------------------------------------------------------------------
+
+/// Kinds held in `grepui_alert_items`.
+pub const ITEM_KINDS: &[&str] = &[
+    "alert",
+    "destination",
+    "downtime",
+    "incident",
+    "state",
+    "lease",
+];
+
+fn item_kind(kind: &str) -> Result<Bind> {
+    if !ITEM_KINDS.contains(&kind) {
+        bail!("unknown alert item kind");
+    }
+    Ok(Bind::Str(kind.to_string()))
+}
+
+/// One alert-side record: a rule, destination, downtime, incident, rule state or lease.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ItemRow {
+    pub item_id: String,
+    pub name: String,
+    pub spec: String,
+    pub owner: String,
+    pub created_ms: i64,
+    pub updated_ms: i64,
+    pub deleted: bool,
+}
+
+const ITEM_COLS: &str = "`item_id`, `name`, `spec`, `owner`, `created_ms`, `updated_ms`";
+
+pub fn item_list(meta_db: &str, org_name: &str, kind: &str) -> Result<Q> {
+    let t = qualified(meta_db, "grepui_alert_items")?;
+    Ok(Q::new(
+        "alert_item_list",
+        format!(
+            "SELECT {ITEM_COLS} FROM {t} WHERE `org_id` = ? AND `kind` = ? AND `deleted` = false ORDER BY `name`, `item_id` LIMIT 1000"
+        ),
+        vec![org(org_name)?, item_kind(kind)?],
+    ))
+}
+
+pub fn item_get(meta_db: &str, org_name: &str, kind: &str, item_id: &str) -> Result<Q> {
+    let t = qualified(meta_db, "grepui_alert_items")?;
+    Ok(Q::new(
+        "alert_item_get",
+        format!(
+            "SELECT {ITEM_COLS} FROM {t} WHERE `org_id` = ? AND `kind` = ? AND `item_id` = ? AND `deleted` = false LIMIT 1"
+        ),
+        vec![
+            org(org_name)?,
+            item_kind(kind)?,
+            Bind::Str(item_id.to_string()),
+        ],
+    ))
+}
+
+pub fn item_put(meta_db: &str, org_name: &str, kind: &str, r: &ItemRow) -> Result<Q> {
+    let t = qualified(meta_db, "grepui_alert_items")?;
+    Ok(Q::new(
+        "alert_item_put",
+        format!(
+            "INSERT INTO {t} (`org_id`, `kind`, `item_id`, `name`, `spec`, `owner`, `created_ms`, `updated_ms`, `deleted`, `ts`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
+        vec![
+            org(org_name)?,
+            item_kind(kind)?,
+            Bind::Str(r.item_id.clone()),
+            Bind::Str(r.name.clone()),
+            Bind::Str(r.spec.clone()),
+            Bind::Str(r.owner.clone()),
+            Bind::Int(r.created_ms),
+            Bind::Int(r.updated_ms),
+            Bind::Bool(r.deleted),
+            Bind::Str(ts_string(r.created_ms)),
+        ],
+    ))
+}
+
+/// One evaluation of one rule. `ts` is when it ran; the table has a TTL.
+pub fn alert_history_put(
+    meta_db: &str,
+    org_name: &str,
+    alert_id: &str,
+    state: &str,
+    outcome: &str,
+    detail: &str,
+    now_ms: i64,
+) -> Result<Q> {
+    let t = qualified(meta_db, "grepui_alert_history")?;
+    Ok(Q::new(
+        "alert_history_put",
+        format!(
+            "INSERT INTO {t} (`org_id`, `alert_id`, `state`, `outcome`, `detail`, `ts`) VALUES (?, ?, ?, ?, ?, ?)"
+        ),
+        vec![
+            org(org_name)?,
+            Bind::Str(alert_id.to_string()),
+            Bind::Str(state.to_string()),
+            Bind::Str(outcome.to_string()),
+            Bind::Str(detail.to_string()),
+            Bind::Str(ts_string(now_ms)),
+        ],
+    ))
+}
+
+/// Newest first; one rule or all of them.
+pub fn alert_history_list(
+    meta_db: &str,
+    org_name: &str,
+    alert_id: Option<&str>,
+    limit: u32,
+    now_ms: i64,
+) -> Result<Q> {
+    let t = qualified(meta_db, "grepui_alert_history")?;
+    let mut binds = vec![org(org_name)?];
+    let mut wh = "`org_id` = ?".to_string();
+    if let Some(a) = alert_id {
+        wh.push_str(" AND `alert_id` = ?");
+        binds.push(Bind::Str(a.to_string()));
+    }
+    wh.push_str(" AND `ts` >= ?");
+    binds.push(Bind::Str(ts_string(now_ms - HISTORY_DAYS * 86_400_000)));
+    Ok(Q::new(
+        "alert_history_list",
+        format!(
+            "SELECT `alert_id`, `state`, `outcome`, `detail`, CAST(`ts` AS BIGINT) AS at_ms FROM {t} WHERE {wh} ORDER BY `ts` DESC LIMIT {}",
+            limit.clamp(1, 500)
+        ),
+        binds,
+    ))
+}

@@ -76,17 +76,17 @@ Status: `planned` (requirement ID and release; a row whose release is `ready` or
 
 | Feature | Evidence | Edition | grepui | Notes |
 |---|---|---|---|---|
-| Scheduled and real-time alerts | read | | planned R-A1, R-A2, 0.9 | Real-time = short-interval polling (differs) |
-| Composite alerts (AND/OR/NOT) | read | | planned R-A3, 0.9 | |
-| Anomaly detection | read | ent (self-hosted) | planned R-A8, 0.9 | MAD baseline, no ML |
-| Builder, SQL, PromQL query modes | read | | planned R-A1, 0.9 | |
-| Check interval or cron, look-back, cooldown | read | | planned R-A1, 0.9 | |
-| Email (SMTP) and webhook destinations, templates, variables | read | | planned R-A4, 0.9 | |
+| Scheduled and real-time alerts | read | | built R-A1, R-A2, 0.9 | Real-time = short-interval polling (differs) |
+| Composite alerts (AND/OR/NOT) | read | | built R-A3, 0.9 | |
+| Anomaly detection | read | ent (self-hosted) | built R-A8, 0.9 | MAD baseline, no ML |
+| Builder, SQL, PromQL query modes | read | | built R-A1, 0.9 | |
+| Check interval or cron, look-back, cooldown | read | | built R-A1, 0.9 | |
+| Email (SMTP) and webhook destinations, templates, variables | read | | built R-A4, 0.9 (plain http and SMTP, no TLS) | |
 | Actions (custom Python scripts) | read | | gap, deliberate | Arbitrary code execution; webhooks instead |
-| Creates incident, incidents page | read | | planned R-A6, 0.9 | |
-| Live preview and summary | read | | planned R-A1, 0.9 | Preview never notifies |
-| Deduplication, compare with past, additional settings | read | | planned R-A5, 0.9 | |
-| Folders, import/export, downtimes, history | nav | | planned R-A5, 0.9 | |
+| Creates incident, incidents page | read | | built R-A6, 0.9 | |
+| Live preview and summary | read | | built R-A1, 0.9 | Preview never notifies |
+| Deduplication, compare with past, additional settings | read | | built R-A5, 0.9 | |
+| Folders, import/export, downtimes, history | nav | | built R-A5, 0.9 | Folders are a label on the rule |
 | Notification dependencies, advanced alert configuration | nav | | gap | Re-check docs |
 | AI-assisted SQL in alert builder | read | | gap | |
 | SLOs | nav | | gap | Revisit after 1.0 |

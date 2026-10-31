@@ -301,7 +301,14 @@ async fn ac_0_1_4_every_listed_route_exists() {
             || route.ends_with("/import")
             || route.ends_with("/move")
             || route.ends_with("/shares/{share}")
-            || route.ends_with("/folders/{id}");
+            || route.ends_with("/folders/{id}")
+            || route.ends_with("/incident")
+            || route.ends_with("/test")
+            || route.ends_with("/ack")
+            || route.ends_with("/resolve")
+            || route.ends_with("/destinations")
+            || route.ends_with("/destinations/{id}")
+            || route.ends_with("/downtimes/{id}");
         if !write_only {
             assert_ne!(r.status, StatusCode::METHOD_NOT_ALLOWED, "{route}");
         }
@@ -353,7 +360,9 @@ fn ac_0_1_4_write_allowlist_is_pinned() {
             "grepui_services",
             "grepui_folders",
             "grepui_dashboards",
-            "grepui_shares"
+            "grepui_shares",
+            "grepui_alert_items",
+            "grepui_alert_history"
         ]
     );
 }

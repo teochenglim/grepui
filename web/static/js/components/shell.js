@@ -12,6 +12,7 @@ const LIVE = [
   ['logs', 'Logs'],
   ['traces', 'Traces'],
   ['dashboards', 'Dashboards'],
+  ['alerts', 'Alerts'],
   ['metrics', 'Metrics'],
   ['services', 'Services'],
   ['service-map', 'Service map'],
@@ -23,7 +24,8 @@ const LIVE = [
   ['connect', 'Connect'],
 ];
 const SOON = [
-  ['Alerts', 'v0.9'],
+  ['Pipelines', 'v0.10'],
+  ['Access control', 'v0.11'],
 ];
 
 export function buildShell(root) {

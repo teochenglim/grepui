@@ -13,7 +13,7 @@ use crate::{
 use anyhow::{Result, bail};
 
 /// Bumped when a migration changes the schema; the binary refuses to run against a newer one.
-pub const SCHEMA_VERSION: i64 = 3;
+pub const SCHEMA_VERSION: i64 = 4;
 /// The one row in `grepui_schema` (`component = 'core'`) holding the version.
 pub const COMPONENT: &str = "core";
 /// How long history entries are kept (also the table TTL).
@@ -56,6 +56,15 @@ pub fn migration_statements(meta_db: &str) -> Result<Vec<String>> {
         format!(
             "CREATE TABLE IF NOT EXISTS `{db}`.`grepui_shares` (`org_id` STRING, `share_id` STRING, `dash_id` STRING, `token_hash` STRING, `created_by` STRING, `created_ms` BIGINT, `expires_ms` BIGINT, `revoked` BOOLEAN, `ts` TIMESTAMP(3) NOT NULL, TIME INDEX (`ts`), PRIMARY KEY (`org_id`, `share_id`))"
         ),
+        // Alerting (v0.9.0). One table for the small, mutable things (rules, destinations,
+        // downtimes, incidents, per-rule state, leader leases), told apart by `kind`; upserted by
+        // (org_id, kind, item_id) at a constant ts, delete is soft. History is append-only with a TTL.
+        format!(
+            "CREATE TABLE IF NOT EXISTS `{db}`.`grepui_alert_items` (`org_id` STRING, `kind` STRING, `item_id` STRING, `name` STRING, `spec` STRING, `owner` STRING, `created_ms` BIGINT, `updated_ms` BIGINT, `deleted` BOOLEAN, `ts` TIMESTAMP(3) NOT NULL, TIME INDEX (`ts`), PRIMARY KEY (`org_id`, `kind`, `item_id`))"
+        ),
+        format!(
+            "CREATE TABLE IF NOT EXISTS `{db}`.`grepui_alert_history` (`org_id` STRING, `alert_id` STRING, `state` STRING, `outcome` STRING, `detail` STRING, `ts` TIMESTAMP(3) NOT NULL, TIME INDEX (`ts`), PRIMARY KEY (`org_id`, `alert_id`)) WITH (ttl = '{HISTORY_DAYS}d')"
+        ),
     ])
 }
 
@@ -67,6 +76,8 @@ pub const TENANT_TABLES: &[&str] = &[
     "grepui_folders",
     "grepui_dashboards",
     "grepui_shares",
+    "grepui_alert_items",
+    "grepui_alert_history",
 ];
 
 /// Allow only statements the store itself builds: `INSERT INTO <meta_db>.<allowlisted table> ...`.

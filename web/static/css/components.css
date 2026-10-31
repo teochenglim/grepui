@@ -156,3 +156,8 @@ button.icon { padding: 1px 6px; border: 0; font-size: 13px; }
 body.tv .side, body.tv .top { display: none; } body.tv .shell { grid-template-columns: 1fr; } body.tv .view { padding: 12px; }
 @media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } .dash-grid > .card { grid-column: auto !important; } }
 .editor textarea { width: 100%; font-family: var(--mono); font-size: 12.5px; min-height: 80px; }
+
+/* Alerts (v0.9.0) */
+.field { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); } .field input, .field select, .field textarea { font-size: 13px; }
+a.btn { display: inline-block; padding: 6px 12px; border-radius: var(--radius); text-decoration: none; }
+.timeline { margin: 4px 0 0; padding-left: 20px; color: var(--muted); font-size: 12.5px; }

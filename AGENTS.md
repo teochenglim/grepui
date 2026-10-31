@@ -1,57 +1,55 @@
 # AGENTS.md
 
-grepui: a multi-tenant observability UI for GreptimeDB (logs, traces, metrics, dashboards, alerts, RBAC and more). One Rust binary (axum) embeds a no-build frontend and queries GreptimeDB over its MySQL protocol; GreptimeDB is the only dependency and holds both telemetry and grepui's own state (`grepui_*` tables). Goal: parity with the reference platform plus useful enterprise features, tracked in `ARCH/07_parity_matrix.md`.
+grepui: a multi-tenant observability UI for GreptimeDB (logs, traces, services, metrics, dashboards, rollups, alerts; pipelines, RBAC, SSO next). One Rust binary (axum) embeds a no-build frontend (`web/static`, ES modules) and queries GreptimeDB over its MySQL protocol. GreptimeDB is the only dependency: it holds telemetry and grepui's own state (`grepui_*` tables). Goal: parity with the reference platform plus its enterprise tier, tracked in `ARCH/07_parity_matrix.md`.
 
-Docs: `ROADMAP.md` = plan · `RELEASE.md` = release log + summary, **newest first** (status table and changelog; keep both current) · `RELEASE/vX.Y.Z.md` = release notes + ACs · `ARCH/` = architecture and why · `docs/adr/` = decisions · `README.md` = end users.
+## Where things stand (update this block each release)
+
+- **Built, `ready`:** v0.1.0 to v0.9.0 (foundation, logs, state and views, traces, services and service map, metrics, rollups and retention, dashboards, alerts and incidents). The user commits and releases; check `git log` for what is committed.
+- **Next:** v0.10.0 pipelines (`RELEASE/v0.10.0.md`), or the LLM/OpenInference track L1 (`ROADMAP.md`, `ARCH/08`). Ask which if not said. Then v0.11 access control (RBAC, SSO, audit), v0.12, v0.13, v1.0.
+- **Docs:** `RELEASE.md` roll-up (status table, changelog newest first, section 5 = verified/unverified ledger) · `RELEASE/vX.Y.Z.md` per release (scope, ACs with named tests, notes, checklist) · `ROADMAP.md` · `ARCH/` (00 requirements, 01 architecture, 03 GreptimeDB facts, 07 parity, 08 LLM) · `docs/adr/0001-0010` · `README.md`.
+- **Code map:** `src/api/*` handlers + `ROUTES`/`WRITE_ROUTES`/router in `api/mod.rs` · `src/query/*` pure SQL builders (`Q` + binds) · `src/store/*` state tables and gate · `src/dash/*` dashboard spec, panels, variables, time · `src/admin.rs` admin DDL gate · `src/alerts/*` rule spec, engine (tick, lease, gates), conditions/MAD, cron, templates, webhook/SMTP delivery · `src/api/alerts.rs` · `src/layout.rs` waterfall/flame/service graph · `src/playground/*` demo data (synth, OTLP encoder, demo dashboard) · `web/static/js/{pages,components,charts,util}` · `tests/ac_*.rs` (shared fakes in `tests/common/mod.rs`: `Fake`, `MemStore`).
 
 ## Commands
 
-- `make check` (= `fmt-check` + `clippy` + `ac-map` + `test` + `version-check` + `no-banned-names`): must pass before claiming anything works. ACs live as `ac<M>_<m>_<n>_*` Rust tests; a new AC needs 2 tests and a row in `RELEASE/vX.Y.Z.md`. Tests ending `_live` need GreptimeDB (`make db-up`, `make test-db`).
-- `make build`, `make run`, `make migrate` (create the state store), `make playground` (migrates, seeds a `demo` database and serves), `make demo` (docker compose, playground mode), `make db-up` / `db-down`, `python3 scripts/seed.py` (demo OTLP data for CI and other databases).
-- `make release VERSION=x.y.z`: user only (see below).
-- The Makefile still has the earlier Go/Node targets until v0.1.0 is built; they are replaced by cargo targets in that release.
+- `make check` (= fmt-check, clippy `-D warnings`, `ac-map`, tests, version-check, no-banned-names): must be green before claiming anything works. `make test-db` runs `_live` tests (need `make db-up`). `make playground` (migrates, seeds `demo`, serves :8080, `--admin-writes` on), `make demo` (compose), `make migrate`, `python3 scripts/seed.py [--db X]`.
+- ACs are tests named `ac_<M>_<m>_<n>_*` mapped to rows in `RELEASE/vX.Y.Z.md`; `scripts/ac-map.sh` needs 2+ tests per AC and every requirement covered. `_live` tests are `#[ignore]` and build a **throwaway database** from `playground::synth` and assert exact numbers; never rely on shared `public` data or flush state.
+- **Before declaring a release ready:** `make check`; `cargo deny check` and `cargo audit`; CI parity `make db-down db-up`, `python3 scripts/seed.py`, `make test-db` (must be 0 failed; it has caught real bugs); browser pass with Playwright (see below) and screenshots in `images/`; docs updated.
 
-## Git & release caveat (important)
+## Git & release (important)
 
-- **The user does ALL git commits, pushes, tags, and releases manually. The agent never runs git commit/push/tag, `make bump`, or `make release`.**
-- The release command is `make release VERSION=x.y.z` (space + `VERSION=`).
-- Workflow: **commit first, then `make release VERSION=x.y.z`**. It amends the bump into that fresh commit, pushes `HEAD`, tags `vX.Y.Z` and pushes the tag. Run it once per commit; on an already-pushed commit it would rewrite history and the push is rejected.
-- When an implementation is finished, give a 1-line commit-message summary; the user commits and releases.
-- `make release` fails unless the repo has at least one commit AND an `origin` remote.
-- `VERSION` is the source of truth; `Cargo.toml` version must match (`make version-check`, enforced in CI); the binary reads it at compile time. Tags are `vX.Y.Z`; CI is tag-driven (`v*`) plus PRs.
+- **The user does ALL git commits, pushes, tags and releases. The agent never runs git commit/push/tag, `make bump` or `make release`.** Finish a release by giving a one-line commit message; the user commits, then runs `make release VERSION=x.y.z`. `VERSION` and `Cargo.toml` must match (the user's release bumps it).
+- The agent cannot run `/compact`; tell the user to.
 
 ## Rules
 
-- Rust stable, edition 2024. `#![forbid(unsafe_code)]`. No `unwrap()`/`expect()` outside tests and `main`.
-- **Naming:** never mention the reference product we compare against anywhere (code, docs, comments, tests, commit text); call it "the reference platform". `make no-banned-names` enforces it. Other products (Quickwit, Jaeger, Grafana, GrepRUM) may be named.
-- New dependency means a row in `ARCH/05_tech_stack_and_release.md`. Prefer std and what is already there. No Node, no JS build step (ARCH 06 D7).
-- **SQL safety:** table names come from validated config identifiers or a fixed `match`; every request-derived value is a bound parameter; time ranges and limits are capped. Never `format!` request text into SQL. Only SQL mode (R-L5) runs user SQL, and only after the parser allowlist.
-- **State store (ADR 0006):** every write goes through `AppState::write` → `store::check_write` (INSERT into the four `grepui_*` tables, nothing else; DDL only from `store::migration_statements`). New table = new migration statement + an entry in `WRITE_TARGETS` + `org_id` leading its primary key + an AC. Updates are upserts at a constant `ts`; deletes are soft. Quote `name` and other reserved words. `TIMESTAMP(3)` casts to milliseconds.
-- **Dashboards (ADR 0009):** panels run only their stored query on the server; variables reach SQL only as binds (`dash::vars`), PromQL values are charset-restricted; markdown and HTML go through `dash::panels` and are shown in a sandboxed frame; every spec goes through `dash::canonical`. Never add a route that takes SQL for a panel, and never render stored text with `innerHTML`.
-- **Admin writes (ADR 0008):** rollup create/drop/backfill and TTL changes live only in `src/admin.rs`, behind `--admin-writes`, generated from templates and re-validated by `admin::check`; a new kind of statement needs an entry in `ADMIN_WRITES`, a gate case, a refusal test and an `ARCH/01` line.
-- **Data plane read-only, writes allowlisted:** telemetry tables are touched only by SELECT/SHOW/TQL builders. Writes go to `grepui_*` metadata tables or to admin-gated TTL, pipeline and flow operations, and the full list lives in one allowlist asserted by a test (R-F4). Adding a write target needs an AC and an `ARCH/01` entry. The one existing exception is playground mode (ADR 0005): demo data into a `demo`/`demo_*` database via OTLP, only from `grepui playground --demo-data`; `serve` must never reference it.
-- **Multi-tenant:** every route is `/api/v1/orgs/{org}/...`; every metadata builder takes the org as a bound argument; every metadata row has `org_id` (R-F5, R-S5). Never resolve a database or table from request text.
-- SQL mode (`sqlmode.rs`) is the only place user-written SQL runs: parser allowlist, one statement, confined to the org's database. Extend the deny list or the AST checks there, with tests, never with regexes.
-- **Every statement variant needs the database check**, not only `FROM` clauses: `SHOW TABLES FROM x`, `SHOW CREATE TABLE x.t`, `DESC x.t` and TQL's `__schema__`/`__database__` matchers all reach other databases (found by security review, reproduced live). TQL stays out of SQL mode; PromQL runs only through `query::metrics::check` and `TQL EVAL` on the Metrics endpoint (v0.6.0), the one place request text is embedded in SQL (TQL has no bind parameters), so any change there needs a test per spelling.
-- Test every query against the real MySQL protocol, not only HTTP: the prepared-statement parser differs (e.g. `INTERVAL '10 minutes'` fails, `SHOW CREATE TABLE` backticks identifiers).
-- Every statement starts with `/* q:<name> */`; every data response carries `meta` (R-Q4).
-- Changed behaviour means updating the `ARCH/` or `RELEASE/` doc it touches, unprompted, plus `RELEASE.md` status and `ARCH/07_parity_matrix.md`. A new implementation choice that changes the decision log means a new file in `docs/adr/`.
-- Test every GreptimeDB statement against the pinned version (`GREPTIME_VERSION` in Makefile), not just by reading docs. Statements not yet run live are listed in `RELEASE.md` section 5.
+- Rust 2024, `#![forbid(unsafe_code)]`, no `unwrap()`/`expect()` outside tests and `main`. New dependency = row in `ARCH/05`. No Node, no JS build step. Frontend never uses `innerHTML` (DOM helper `h()` in `util/dom.js`).
+- **Naming:** never write the reference product's name anywhere (code, docs, comments, tests, URLs); say "the reference platform". `no-banned-names` test enforces it (it caught the agent once via a pasted URL).
+- **SQL safety:** table names from validated identifiers or fixed matches; every request value is a bound parameter; windows and limits capped (31 days, 1000 rows); every statement starts `/* q:<name> */` and every data response carries `meta` ("Show SQL"). User-written SQL runs only in SQL mode and dashboard SQL panels via `query::sqlmode::check` (parser allowlist, one statement, confined to the org DB, every statement variant checked, TQL refused). Extend it with tests, never regexes.
+- **PromQL (v0.6.0)** is the one place request text is embedded in SQL (`TQL EVAL` has no binds): only through `query::metrics::check` (no `;`/`#`, no backslash outside strings, strings decoded, `__schema__`/`__database__` refused case-insensitively in every spelling) and only when the org's database equals the connection's. Any change needs a test per spelling.
+- **State store (ADR 0006):** writes only via `AppState::write` → `store::check_write` (INSERT into `WRITE_TARGETS`: schema, views, history, services, folders, dashboards, shares, alert_items, alert_history); DDL only from `store::migration_statements`; `SCHEMA_VERSION` is 4. New table = migration + `WRITE_TARGETS` + `TENANT_TABLES` + `org_id` leading the PK + AC + MemStore support in `tests/common`. Upserts at constant `ts`, soft deletes, `TIMESTAMP(3)` casts to ms, quote `name`.
+- **Admin writes (ADR 0008):** rollup create/drop/backfill and TTL only in `src/admin.rs`, behind `--admin-writes`, templates re-checked by `admin::check`, logged as `audit`; new kinds need `ADMIN_WRITES`, a gate case and a refusal test.
+- **Dashboards (ADR 0009):** panels run only their stored query on the server; variables bind as `?` (`dash::vars`); text panels sanitised in `dash::panels` and shown in a sandboxed iframe; every spec goes through `dash::canonical`. Never add a route that takes SQL for a panel.
+- **Alerts (ADR 0010):** rules run only their saved query (SQL via `sqlmode::check`, PromQL via `metrics::check`, builder from validated columns); a preview is a GET and writes nothing; delivery is plain `http://` webhooks and plain SMTP (no TLS client), destination URLs are validated in `alerts::webhook_target`; replicas coordinate by a write-then-read lease per rule, not compare-and-set. Test with `alert_app`/`Rec` in `tests/common`; logs keep the service in `resource_attributes` (`json_get_string(.., '["service.name"]')`), not a `service_name` column.
+- **Multi-tenant:** every route is `/api/v1/orgs/{org}/...`; never resolve a database or table from request text. Only the `default` org exists until v0.11.0 (so TQL, which cannot be qualified, is guarded).
+- Test statements against the real MySQL protocol and the pinned GreptimeDB (**v1.3.0**, `GREPTIME_VERSION` in Makefile). Joins/`IN (subquery)` are correct on 1.3.0 (wrong on 1.2.x, ADR 0007); a new join needs a live test against an independently computed answer. A repeated aggregate expression in one select list is a planner error: compute each once.
+- Changed behaviour = update the `ARCH/`/`RELEASE/` doc, `RELEASE.md`, `ARCH/07`, and add an ADR for decisions, in the same change. Read-only routes vs `WRITE_ROUTES` are pinned by `tests/ac_foundation.rs` (new write-only routes need its `fill()` placeholders and `write_only` list).
 
-- **GreptimeDB is pinned to v1.3.0** (`GREPTIME_VERSION` in the Makefile, the compose file, CI via `make db-up`); older versions are unsupported. Joins, `IN (subquery)` and `EXISTS` returned wrong, nondeterministic rows on v1.2.x and are correct on v1.3.0 (retested, ADR 0007); the trace filters keep conditional aggregation anyway. Any new join needs a live test against an independently computed answer. Compute each aggregate once: a repeated aggregate expression in one select list is still a planner error.
-- **Live tests must not depend on flush state or shared data.** A freshly seeded GreptimeDB has `data_length = 0` (CI failed v0.3.0 on this), and the shared `public` database accumulates duplicate seed runs. Build a throwaway database from the deterministic generator and assert exact numbers (see `tests/ac_traces.rs`). Before tagging, reproduce CI: `make db-down db-up`, `python3 scripts/seed.py`, `make test-db`.
+## Working method that worked
+
+1. Read `RELEASE/vX.Y.Z.md`, the related `ARCH` section and the neighbouring code; probe GreptimeDB live first (HTTP `:4000/v1/sql?db=`; the local `mysql` client cannot authenticate, so use curl or a Rust test) before designing SQL.
+2. Backend builders + handlers, then tests (offline with `Fake`/`MemStore`, plus `_live`), then frontend, then browser pass, then docs, then the full gate.
+3. The embedded UI is compiled in: after editing `web/static`, restart the server **on a new port** (browser caches ES modules). Playwright: `playground --listen 127.0.0.1:81xx --demo-data --admin-writes --wait 30 --greptime-mysql mysql://root@127.0.0.1:4002/demo`; stop it with `pkill -f "grepui playground"` when done.
+4. Scratch files go in the session scratchpad, not the repo. Deleting directories (`rm -rf`) is blocked in this environment; leftover scratch dirs are the user's to delete.
+5. Report honestly: say what was not exercised in a browser and any limits; record them in the release notes and `RELEASE.md` section 5.
+
+## Pitfalls already paid for
+
+- `cargo fmt` reflows code, so scripted text replacements on previously formatted files often miss; check the replacement landed (or use direct edits). Heredocs inside heredocs break: write a script file instead.
+- macOS `sed -i` needs `''`. GreptimeDB `TIMESTAMP(9)` is ns (convert in SQL), `TIMESTAMP(3)` ms; integer division on BIGINT truncates (cast to DOUBLE); `name` is reserved; `INTERVAL` literals fail in prepared statements (use integer arithmetic); the OTLP endpoint takes protobuf only; v1.3.0 flows are the batching kind (sink recomputed from source; flow only sees writes after creation; `ADMIN FLUSH_FLOW('name')` forces a run); OTLP counters create `<name>_total` tables on the metric engine; Flow sinks get `update_at`; append-mode tables reject DELETE; TTL echoes as `ttl=7days`, `2months 29days ...`.
+- Foundation test: a 404 with a JSON `error` body counts as routed; a bare 404 means unrouted.
+- Clippy `type_complexity` and `useless format!` fail the gate; run clippy before live runs.
+- Docs generated early on (`RELEASE.md`, `RELEASE/*.md`) are now hand-maintained; edit them directly, newest first.
 
 ## Supply chain
 
-- `.github/workflows/security.yml` (modelled on teochenglim/cogent): Semgrep SAST, Trivy filesystem and image scans, SARIF to the Security tab, weekly. Run the same scans locally with docker before a release.
-- The runtime image is `distroless/base-nossl` plus `libgcc_s` (grepui does no TLS), which keeps OpenSSL CVEs out. If TLS to GreptimeDB is added, change the base and re-scan.
-
-## Gotchas
-
-- Timestamps are `TIMESTAMP(9)` (ns): convert to ms/us in SQL before they reach JSON/JS.
-- Quote reserved words in GreptimeDB SQL.
-- Span attributes are flat columns named `span_attributes.<key>`; log and resource attributes are JSON (trace pipeline v1; verified on v1.2.1 and v1.3.0; the opt-in `greptime_trace_v2` stores attributes in JSON2 columns, see ARCH/08).
-- GreptimeDB's OTLP endpoint accepts protobuf only.
-- Flow sink tables get an extra `update_at` column; do not `SELECT *` from them.
-- Append-mode tables reject `DELETE`; erasure relies on TTL.
-- macOS `sed -i` needs an empty suffix argument; prefer editing files directly.
+`.github/workflows/security.yml` (Semgrep, Trivy fs + image, SARIF, weekly, pinned SHAs). Runtime image is `distroless/base-nossl` plus `libgcc_s` (no TLS in grepui); if TLS to GreptimeDB is added, change the base and re-scan. Dependencies are checked with `cargo deny` and `cargo audit`.

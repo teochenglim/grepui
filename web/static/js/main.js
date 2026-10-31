@@ -2,6 +2,8 @@
 
 import * as api from './api.js';
 import { buildShell } from './components/shell.js';
+import { alertEditPage } from './pages/alert-edit.js';
+import { alertsPage } from './pages/alerts.js';
 import { dashboardPage } from './pages/dashboard.js';
 import { dashboardsPage } from './pages/dashboards.js';
 import { catalogPage } from './pages/catalog.js';
@@ -32,6 +34,8 @@ route('dashboards', dashboardsPage);
 route('dashboards/:id', dashboardPage);
 route('playlists/:id', playlistPage);
 route('public/:token', publicPage);
+route('alerts', alertsPage);
+route('alerts/:id', alertEditPage);
 route('metrics', metricsPage);
 route('services', servicesPage);
 route('services/:name', serviceDetailPage);

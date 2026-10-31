@@ -15,9 +15,9 @@
 | sha2 | SHA-256 of public dashboard link tokens (already in the tree through sqlx) | 0.8 |
 | argon2 | Password hashing, tokens | 0.11 |
 | openidconnect or jsonwebtoken + reqwest (rustls) | OIDC SSO | 0.11 |
-| lettre | SMTP for alerts and reports | 0.9 |
-| reqwest (rustls) | Webhooks, GreptimeDB pipeline API | 0.9 |
-| cron | Cron schedules for alerts and reports | 0.9 |
+| ~~lettre~~ | Not adopted in 0.9: alert email is a 60-line plain-SMTP client (relay on a trusted network); revisit with TLS | |
+| reqwest (rustls) | HTTPS webhooks, GreptimeDB pipeline API (0.9 webhooks are plain http written in the crate) | 0.10 |
+| ~~cron~~ | Not adopted in 0.9: a five-field UTC parser is in `alerts::cron` (about 100 lines, tested) | |
 
 ### Considered and not adopted
 

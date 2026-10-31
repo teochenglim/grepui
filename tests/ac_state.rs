@@ -44,7 +44,9 @@ fn ac_0_3_1_write_allowlist_is_metadata_only() {
             "grepui_services",
             "grepui_folders",
             "grepui_dashboards",
-            "grepui_shares"
+            "grepui_shares",
+            "grepui_alert_items",
+            "grepui_alert_history"
         ]
     );
     // The migration creates exactly those tables, all in the metadata database.
@@ -260,8 +262,8 @@ async fn ac_0_3_1_migrate_runs_every_statement_once_and_stamps_the_version() {
     let done = store::migrate(store.as_ref(), store.as_ref(), "grepui")
         .await
         .unwrap();
-    assert_eq!(done.len(), 8);
-    assert_eq!(store.ddl.lock().unwrap().len(), 8);
+    assert_eq!(done.len(), 10);
+    assert_eq!(store.ddl.lock().unwrap().len(), 10);
     assert_eq!(*store.version.lock().unwrap(), Some(SCHEMA_VERSION));
     // Running it again is the same operation (idempotent by IF NOT EXISTS + upsert).
     store::migrate(store.as_ref(), store.as_ref(), "grepui")
@@ -314,6 +316,8 @@ async fn ac_0_3_1_migrate_idempotent_live() {
     assert_eq!(
         names,
         [
+            "grepui_alert_history",
+            "grepui_alert_items",
             "grepui_dashboards",
             "grepui_folders",
             "grepui_history",

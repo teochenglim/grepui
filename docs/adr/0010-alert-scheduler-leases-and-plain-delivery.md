@@ -1,0 +1,20 @@
+# 0010 Alerts: a lease per rule in the state store, and plain-TCP delivery
+
+Status: Accepted (v0.9.0).
+
+## Context
+
+Alert rules must fire once however many replicas run, survive a restart, and call out to webhooks and mail servers. GreptimeDB is the only dependency: there is no Redis, no SQL transaction and no compare-and-set. grepui has no TLS client (the runtime image is `distroless/base-nossl`).
+
+## Decision
+
+- **Every replica runs the scheduler; a lease row per rule decides who evaluates.** The lease is an item of kind `lease` in `grepui_alert_items` (holder, expiry), 30 s long. A replica claims a free or expired lease by *writing* it, waiting 300 ms and *reading it back*: whoever wrote last holds it, and a replica that reads another holder stays out. The claim is preceded by a fresh read (the tick's snapshot may be old), and after winning the rule's state is re-read and `due` re-checked, so a rule another replica just ran is not run again. A holder renews its leases on every 5 s tick when under half is left, so a rule stays with one replica and a dead one loses its rules after at most 30 s. This is a mutex by convention, not a proof: two writes more than the settle time apart can both win. The residual risk is one duplicate evaluation (the dedup window and cooldown then suppress the second notification), never a missed rule.
+- **State is small rows, history is append-only.** Rules, destinations, downtimes, incidents, per-rule state and leases are all kind-tagged rows of one table (`grepui_alert_items`, upsert at a constant `ts`, soft delete, `org_id` leading the key); every evaluation also appends a row to `grepui_alert_history` (30-day TTL). Both go through `AppState::write` and its allowlist like every other state table; schema version 4.
+- **Rules run saved queries only.** SQL passes `sqlmode::check` against the org's database when it runs (and the statement shape when saved), PromQL passes `metrics::check` and the same single-database guard as dashboards, and the builder composes SQL from validated column names with bound values. The preview route is a GET that reads and writes nothing.
+- **Gates in order:** downtime (silences and records), rule cooldown (since the rule's last notification), dedup (per fingerprint of the chosen label values, within a window). A real-time rule whose last run cost more than its budget pauses for six intervals and says so in the history.
+- **Delivery is plain TCP with short timeouts.** A webhook is one HTTP/1.1 POST of a JSON payload (the rendered message is a JSON string, so a label value cannot change the structure); an email is one SMTP conversation to a relay (`--smtp host:port`, no STARTTLS, no login) with addresses validated for whitespace and control characters, the subject on one line and encoded when not ASCII, and dot-stuffed bodies. Webhook URLs must be `http://`, carry no credentials and not point at the unspecified or link-local addresses. For HTTPS targets or authenticated mail, put a relay on the local network. Adding TLS later means changing the base image and re-scanning (see AGENTS.md).
+- **Real-time means short-interval polling** (default 10 s, 5–60 s), not an ingest hook (ARCH 06).
+
+## Consequences
+
+Failover takes up to the lease time. A write per held rule roughly every 15 s is the price of stable ownership; it is fine for hundreds of rules, and a larger fleet would want a coarser lease (one per replica). Delivery to a webhook cannot be retried beyond what the next evaluation does. Destinations are plain URLs without secrets, so nothing sensitive is stored there; access control and audit of rule changes arrive with v0.11.0 (until then the owner is `local`).

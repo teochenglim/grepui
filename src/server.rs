@@ -40,6 +40,9 @@ pub async fn serve(cfg: Config) -> Result<()> {
     }
     let listen = cfg.listen.clone();
     let app = api::AppState::with_parts(cfg, reader.clone(), reader, system_clock())?;
+    if !app.cfg.no_alerts {
+        crate::alerts::engine::spawn(app.clone(), app.sender.clone());
+    }
     let listener = tokio::net::TcpListener::bind(&listen).await?;
     tracing::info!(version = crate::VERSION, %listen, "grepui listening");
     axum::serve(listener, api::router(app))

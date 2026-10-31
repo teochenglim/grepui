@@ -2,7 +2,7 @@
 
 The single place to see where grepui stands: what is shipped, what is planned, what each release proves, and how a release is cut. Per-release detail (scope, acceptance criteria, named tests, checklist) lives in [`RELEASE/vX.Y.Z.md`](RELEASE/README.md); this file is the readable roll-up and the changelog.
 
-> **Current state:** v0.1.0 to v0.8.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.9.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
+> **Current state:** v0.1.0 to v0.9.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.10.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
 
 ## 1. Summary
 
@@ -21,7 +21,7 @@ grepui is a multi-tenant observability UI for GreptimeDB: one Rust binary (axum)
 
 ## 2. Release status
 
-Latest built: **v0.8.0: Dashboards** (ready). Newest first.
+Latest built: **v0.9.0: Alerts and incidents** (ready). Newest first.
 
 | Release | Theme | Status | ACs | Requirements covered |
 |---|---|---|---|---|
@@ -30,7 +30,7 @@ Latest built: **v0.8.0: Dashboards** (ready). Newest first.
 | [v0.12.0](RELEASE/v0.12.0.md) | Query management, work groups and federation | planned | 5 | R-W1 R-W2 R-W3 R-Y1 R-Y2 |
 | [v0.11.0](RELEASE/v0.11.0.md) | Access control, multi-tenancy, SSO and audit | planned | 7 | R-C1 R-C2 R-C3 R-C4 R-C5 R-C6 |
 | [v0.10.0](RELEASE/v0.10.0.md) | Pipelines, functions, enrichment, redaction | planned | 4 | R-F4 R-N1 R-N2 R-N3 R-N4 |
-| [v0.9.0](RELEASE/v0.9.0.md) | Alerts and incidents | planned | 8 | R-A1 R-A2 R-A3 R-A4 R-A5 R-A6 R-A7 R-A8 |
+| [v0.9.0](RELEASE/v0.9.0.md) | Alerts and incidents | ready | 8 | R-A1 R-A2 R-A3 R-A4 R-A5 R-A6 R-A7 R-A8 |
 | [v0.8.0](RELEASE/v0.8.0.md) | Dashboards | ready | 6 | R-B1 R-B2 R-B3 R-B4 R-B5 R-B6 |
 | [v0.7.0](RELEASE/v0.7.0.md) | Rollups and extended retention | ready | 4 | R-F4 R-P1 R-P2 R-P3 R-X1 |
 | [v0.6.0](RELEASE/v0.6.0.md) | Metrics | ready | 2 | R-M1 R-M2 |
@@ -60,6 +60,12 @@ Newest first. An entry is written when a release becomes `ready`; the same text 
 ### Unreleased
 
 - Requirements, architecture, positioning and parity matrix (ARCH 00–07), release plan with ACs for v0.1.0–v1.0.0, `scripts/seed.py` (demo traces and logs over OTLP/protobuf, `--db` per org).
+
+### v0.9.0: Alerts and incidents (ready)
+
+Added: alert rules (scheduled, real-time, composite, anomaly) over SQL, PromQL or a field builder, with interval or cron schedules, look-back, cooldown, compare-with-past, dedup by fingerprint, downtimes, history, JSON import and export and a preview that runs a rule once without writing or notifying; webhook and SMTP destinations with templates and test-send; incidents (open from a firing rule or by hand, acknowledge, resolve, timeline); a scheduler in every replica with a lease per rule in the state store (ADR 0010); an Alerts section and editor in the UI; one demo rule in the playground. The anomaly rule flags the newest point outside the rolling median ± k·MAD and stays quiet until enough history exists.
+
+State schema is now version 4 (`grepui_alert_items`, `grepui_alert_history`): run `grepui migrate`. New flags `--no-alerts`, `--smtp`, `--smtp-from`; no new dependency (cron, SMTP and the webhook POST are in the crate). Limits: webhooks are `http://` only and SMTP has no TLS or login (use a relay); the lease is write-then-read, not compare-and-set. Verified live on a fresh v1.3.0 (exact per-service counts, builder count, lease handover between two replicas) and in a browser (list, editor with preview and history, destinations with a failing test-send, incident acknowledge); not exercised in a browser: creating a rule through the form, the builder and composite forms, downtimes, import, delete.
 
 ### v0.8.0: Dashboards (ready)
 
@@ -163,6 +169,7 @@ Honest ledger of what has actually been run. Updated as releases land.
 | OpenInference spans on trace v2 (JSON2) | spike on v1.3.0: stored with 19 fixed columns (300 indexed messages and a 200 KB prompt in one span), queried with `json_get_*(col, '["key"]')`; grepui's trace list/waterfall/logs work on a v2 table, its span panel and attribute filters do not yet (roadmap LLM track L1) |
 | CI-parity run (fresh `make db-down db-up`, seed, `make test-db`) | green for every live test after the v0.4.0 fixes; it reproduced the v0.3.0 CI failure and found the join bug below |
 | **GreptimeDB v1.2.1: `IN (subquery)`, `EXISTS` and self-joins on a telemetry table return wrong, nondeterministic rows** | verified live (4 / 6 / 5 / 0 for a true 33); no such query is used (ADR 0007); the v0.5.0 dependency self-join is verified correct on v1.3.0 (`ac_0_5_3_dependencies_live`) |
+| Alerts: rule evaluation, dedup, cooldown, downtimes, incidents, history, lease between two replicas, webhook delivery, SMTP (v0.9.0) | verified live (exact counts per service and builder count against the generator, lease handover on v1.3.0, the demo rule fires, dedups and opens an incident) and in a browser; webhook and SMTP are tested against local fake servers only, never a real mail relay or an https endpoint; the lease is not compare-and-set |
 | Dashboards: save, reload, variables bound as parameters, panel shapes, compare, public links, cascade delete, import and export (v0.8.0) | verified live (exact panel numbers against the generator, hostile variable values as plain values, real state store) and in a browser; the HTML sanitiser is hand written and covered by an attack-string test |
 | Rollup planner, rollup create/backfill/drop, retention preview and TTL set (v0.7.0) | verified live (exact sink contents, flow keeps up, idempotent backfill, exact preview) and in a browser; flow type on v1.3.0 is batching |
 | PromQL through TQL EVAL, metric and label lists, SQL on metric tables (v0.6.0) | verified live against generated metrics (exact counter and gauge values, rate within 5%) and in a browser; `TQL EVAL` works over the MySQL prepared-statement protocol |
