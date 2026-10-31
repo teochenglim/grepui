@@ -1,6 +1,6 @@
 # ARCH 08: LLM observability (OpenInference and OTel GenAI)
 
-Status: **steps L1 (v0.14.0, ADR 0015) and L2, L4, L5 with masking from L6 (v0.15.0, ADR 0016) built; L3 and the L6 alerts planned for v0.16.0.** This document records what was verified (2026-10-31), the design that follows from it, candidate requirements and the risks. It adds no requirement IDs to ARCH 00 yet: `make ac-map` requires every ID to be covered by an AC, so IDs are added when a release is written.
+Status: **steps L1 (v0.14.0, ADR 0015) and L2, L4, L5 with masking from L6 (v0.15.0, ADR 0016) built; L3 and the L6 alerts (v0.16.0, ADR 0017). The LLM track is complete.** This document records what was verified (2026-10-31), the design that follows from it, candidate requirements and the risks. It adds no requirement IDs to ARCH 00 yet: `make ac-map` requires every ID to be covered by an AC, so IDs are added when a release is written.
 
 ## 1. What "store OpenInference traces" means for grepui
 

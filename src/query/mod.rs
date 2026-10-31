@@ -3,6 +3,7 @@
 
 pub mod build;
 pub mod filter;
+pub mod llm;
 pub mod logs;
 pub mod metrics;
 pub mod reader;

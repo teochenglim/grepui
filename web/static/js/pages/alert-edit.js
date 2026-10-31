@@ -22,7 +22,7 @@ export async function alertEditPage(view, { id }) {
   const msg = h('div');
   const say = (t, kind = '') => mount(msg, t ? h('div', { class: `callout ${kind}` }, t) : null);
   const kind = sel(['scheduled', 'realtime', 'composite', 'anomaly'], s.kind);
-  const qkind = sel(['sql', 'promql', 'builder'], s.query?.kind || 'sql');
+  const qkind = sel(['sql', 'promql', 'builder', 'llm'], s.query?.kind || 'sql');
   const sections = h('div', { class: 'stack' });
 
   const els = {
@@ -30,6 +30,7 @@ export async function alertEditPage(view, { id }) {
     text: h('textarea', { rows: 5, spellcheck: 'false', 'aria-label': 'Query' }, s.query?.text || ''),
     bsource: sel(['logs', 'traces'], b.source), bagg: sel(['count', 'avg', 'min', 'max', 'sum'], b.agg), bfield: inp(b.field),
     bfilters: h('textarea', { rows: 3, placeholder: 'column=value, one per line' }, (b.filters || []).map((x) => `${x.field}=${x.value}`).join('\n')), bgroup: inp((b.group_by || []).join(', ')),
+    lmetric: sel(['cost', 'tokens', 'calls', 'error_rate', 'latency_p95'], s.query?.llm?.metric || 'cost'), lmodel: inp(s.query?.llm?.model || '', { placeholder: 'any model' }), lper: h('input', { type: 'checkbox', checked: s.query?.llm?.per_model ? true : null }),
     op: sel(OPS, s.condition?.op || '>'), thr: inp(s.condition?.threshold ?? 0, { type: 'number', step: 'any' }),
     cmpOn: h('input', { type: 'checkbox', checked: s.condition?.compare ? true : null }), cmpOff: inp(s.condition?.compare?.offset_s ?? 3600, { type: 'number' }), cmpMode: sel(['ratio', 'diff'], s.condition?.compare?.mode || 'ratio'),
     every: inp(s.schedule?.every_s ?? '', { type: 'number', placeholder: `${info.default_realtime_s} real-time / 60` }), cron: inp(s.schedule?.cron ?? '', { placeholder: 'or cron: */5 * * * *' }),
@@ -48,7 +49,9 @@ export async function alertEditPage(view, { id }) {
     const r = { name: els.name.value, kind: k, enabled: els.enabled.checked, description: els.desc.value, folder: els.folder.value, lookback_s: num(els.look), cooldown_s: num(els.cool) ?? 0, open_incident: els.incident.checked, destinations: destBoxes.filter(([, c]) => c.checked).map(([d]) => d.id), dedup: { fields: els.dfields.value.split(',').map((x) => x.trim()).filter(Boolean), window_s: num(els.dwin) ?? 0 }, template: { subject: els.subj.value, body: els.body.value } };
     if (k === 'composite') r.composite = JSON.parse(els.comp.value);
     else {
-      r.query = qkind.value === 'builder'
+      r.query = qkind.value === 'llm'
+        ? { kind: 'llm', llm: { metric: els.lmetric.value, ...(els.lmodel.value.trim() ? { model: els.lmodel.value.trim() } : {}), per_model: els.lper.checked } }
+        : qkind.value === 'builder'
         ? { kind: 'builder', builder: { source: els.bsource.value, agg: els.bagg.value, field: els.bfield.value, filters: lines(els.bfilters.value).map((l) => ({ field: l.split('=')[0].trim(), value: l.slice(l.indexOf('=') + 1) })), group_by: els.bgroup.value.split(',').map((x) => x.trim()).filter(Boolean) } }
         : { kind: qkind.value, text: els.text.value };
       if (k === 'anomaly') r.anomaly = { k: num(els.ak), window: num(els.awin), min_points: num(els.amin), direction: els.adir.value };
@@ -65,7 +68,9 @@ export async function alertEditPage(view, { id }) {
       k === 'composite'
         ? h('div', { class: 'card stack' }, h('h2', null, 'Expression'), h('p', { class: 'muted' }, 'AND / OR / NOT over other alerts: {"and": [{"alert": "<id>"}, {"not": {"alert": "<id>"}}]}. A loop is refused on save.'), els.comp)
         : h('div', { class: 'card stack' }, h('h2', null, 'Query'), field('qk', 'Language', qkind),
-          qkind.value === 'builder'
+          qkind.value === 'llm'
+            ? h('div', { class: 'stack' }, h('div', { class: 'row' }, field('lm', 'Metric', els.lmetric), field('lmo', 'Model', els.lmodel), h('label', { class: 'field' }, h('span', null, 'One alert per model'), els.lper)), h('span', { class: 'muted' }, 'Model calls over the look-back window, from the org\'s trace v2 table: cost in dollars (reported, plus the price table), tokens, calls, error rate in percent, p95 latency in ms. Dedup on the label model for one alert per model.'))
+            : qkind.value === 'builder'
             ? h('div', { class: 'row' }, field('bs', 'Source', els.bsource), field('ba', 'Aggregate', els.bagg), field('bf', 'Column (not for count)', els.bfield), field('bfi', 'Filters', els.bfilters), field('bg', 'Group by', els.bgroup))
             : h('div', { class: 'stack' }, els.text, h('span', { class: 'muted' }, qkind.value === 'sql' ? 'One read-only statement. $__from and $__to are the look-back window. The last numeric column is the value; the other columns are labels (they decide the dedup fingerprint).' : 'PromQL evaluated now; each series is a label set.')),
           k === 'anomaly'

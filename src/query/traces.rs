@@ -19,7 +19,7 @@ pub const SPANS_MAX: u32 = 5_000;
 pub const MAX_OFFSET: u32 = 10_000;
 pub const TS: &str = "`timestamp`";
 const ERR_SQL: &str = "`span_status_code` = 'STATUS_CODE_ERROR'";
-const ROOT_SQL: &str = "(`parent_span_id` IS NULL OR `parent_span_id` = '')";
+pub(super) const ROOT_SQL: &str = "(`parent_span_id` IS NULL OR `parent_span_id` = '')";
 
 /// How a traces table stores attributes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
@@ -224,7 +224,7 @@ fn cond_sql(c: &RCond) -> (String, Vec<Bind>) {
 
 /// Span-level predicates without the window: service, errors, conditions, free text (matched on
 /// the span name). `None` when there is nothing to filter on.
-fn span_pred(f: &TraceFilter) -> Option<(String, Vec<Bind>)> {
+pub(super) fn span_pred(f: &TraceFilter) -> Option<(String, Vec<Bind>)> {
     let mut parts: Vec<String> = vec![];
     let mut binds = vec![];
     if let Some(s) = &f.service {

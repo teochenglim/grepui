@@ -240,6 +240,9 @@ async fn run_sql(
     w: Window,
     ev: &mut Evaluation,
 ) -> Result<Vec<Value>, String> {
+    if q.kind == "llm" {
+        return Err("an LLM query runs as a threshold rule only".into());
+    }
     let query = if q.kind == "builder" {
         let b = q.builder.as_ref().ok_or("the builder is missing")?;
         super::builder_sql(org, b, w).map_err(|e| e.to_string())?
@@ -303,6 +306,15 @@ async fn current(
                     value: v,
                 })
             })
+            .collect());
+    }
+    if q.kind == "llm" {
+        let m = q.llm.as_ref().ok_or("the llm settings are missing")?;
+        let (values, sql) = crate::api::llm::alert_values(s, org, m, w).await?;
+        ev.sql.extend(sql);
+        return Ok(values
+            .into_iter()
+            .map(|(labels, value)| Raw { labels, value })
             .collect());
     }
     rows_to_raw(&run_sql(s, org, q, w, ev).await?)

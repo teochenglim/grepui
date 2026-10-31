@@ -27,21 +27,25 @@ const COLS_TTL: Duration = Duration::from_secs(60);
 
 #[derive(Deserialize)]
 pub struct TraceParams {
-    from: Option<i64>,
-    to: Option<i64>,
-    limit: Option<u32>,
-    offset: Option<u32>,
-    q: Option<String>,
-    service: Option<String>,
-    errors: Option<bool>,
-    min_ms: Option<i64>,
+    pub(super) from: Option<i64>,
+    pub(super) to: Option<i64>,
+    pub(super) limit: Option<u32>,
+    pub(super) offset: Option<u32>,
+    pub(super) q: Option<String>,
+    pub(super) service: Option<String>,
+    pub(super) errors: Option<bool>,
+    pub(super) min_ms: Option<i64>,
     span: Option<String>,
+    /// LLM analytics: `model`, `provider`, `kind` or `tool` (v0.16.0).
+    pub(super) by: Option<String>,
+    /// LLM analytics: only this model.
+    pub(super) model: Option<String>,
     /// `all` or `a,b`: read from these sources and merge by time (v0.12.0).
     sources: Option<String>,
 }
 
 /// Columns of the traces table (including the flat attribute columns), cached briefly.
-async fn columns(s: &Shared, org: &Org) -> Result<Arc<Vec<String>>, ApiError> {
+pub(super) async fn columns(s: &Shared, org: &Org) -> Result<Arc<Vec<String>>, ApiError> {
     let key = format!("{}/{}", org.name, org.traces_table);
     if let Some((at, c)) = s.cols_cache.lock().ok().and_then(|m| m.get(&key).cloned())
         && at.elapsed() < COLS_TTL
@@ -70,7 +74,11 @@ async fn columns(s: &Shared, org: &Org) -> Result<Arc<Vec<String>>, ApiError> {
     Ok(cols)
 }
 
-async fn filter(s: &Shared, org: &Org, p: &TraceParams) -> Result<TraceFilter, ApiError> {
+pub(super) async fn filter(
+    s: &Shared,
+    org: &Org,
+    p: &TraceParams,
+) -> Result<TraceFilter, ApiError> {
     let parsed = parse(p.q.as_deref().unwrap_or_default())?;
     let service = p
         .service

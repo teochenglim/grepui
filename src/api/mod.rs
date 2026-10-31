@@ -484,6 +484,11 @@ pub const ROUTES: &[&str] = &[
     "/api/v1/orgs/{org}/reports/{id}/preview",
     "/api/v1/orgs/{org}/reports/{id}/run",
     "/api/v1/orgs/{org}/reports/{id}/history",
+    "/api/v1/orgs/{org}/llm/overview",
+    "/api/v1/orgs/{org}/llm/breakdown",
+    "/api/v1/orgs/{org}/llm/sessions",
+    "/api/v1/orgs/{org}/llm/sessions/{id}",
+    "/api/v1/orgs/{org}/llm/users",
     "/api/v1/orgs/{org}/llm/prices",
     "/api/v1/orgs/{org}/llm/content",
     "/api/v1/orgs/{org}/llm/feedback",
@@ -934,6 +939,14 @@ pub fn router(state: Shared) -> Router {
             "/api/v1/orgs/{org}/traces/{id}/agent-graph",
             get(traces::agent_graph),
         )
+        .route("/api/v1/orgs/{org}/llm/overview", get(llm::overview))
+        .route("/api/v1/orgs/{org}/llm/breakdown", get(llm::breakdown))
+        .route("/api/v1/orgs/{org}/llm/sessions", get(llm::sessions))
+        .route(
+            "/api/v1/orgs/{org}/llm/sessions/{id}",
+            get(llm::session_detail),
+        )
+        .route("/api/v1/orgs/{org}/llm/users", get(llm::users))
         .route(
             "/api/v1/orgs/{org}/llm/content",
             get(llm::content_get).put(llm::content_put),

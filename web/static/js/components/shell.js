@@ -11,6 +11,7 @@ import { timeRange } from './timerange.js';
 const LIVE = [
   ['logs', 'Logs'],
   ['traces', 'Traces'],
+  ['llm', 'LLM'],
   ['dashboards', 'Dashboards'],
   ['alerts', 'Alerts'],
   ['metrics', 'Metrics'],
@@ -28,9 +29,7 @@ const LIVE = [
   ['retention', 'Retention'],
   ['connect', 'Connect'],
 ];
-const SOON = [
-  ['LLM analytics and sessions', 'L3'],
-];
+const SOON = [];
 
 /** Who is signed in, with sign-out (R-C1). With --no-auth there is nobody to sign out. */
 function whoMenu() {
@@ -70,7 +69,7 @@ export function buildShell(root) {
       roleIn(state.org) === 'admin' ? h('a', { class: `nav${cur === 'admin' ? ' active' : ''}`, href: href('admin') }, 'Administration') : null,
       roleIn(state.org) === 'admin' ? h('a', { class: `nav${cur === 'reports' ? ' active' : ''}`, href: href('reports') }, 'Reports') : null,
       session.me?.platform_admin && !session.me?.no_auth ? h('a', { class: `nav${cur === 'platform' ? ' active' : ''}`, href: href('platform') }, 'Platform') : null,
-      h('h3', null, 'Coming'),
+      SOON.length ? h('h3', null, 'Coming') : null,
       SOON.map(([label, v]) => h('span', { class: 'nav soon', title: `Planned for ${v}` }, label, h('span', { class: 'badge' }, v))),
     );
   };

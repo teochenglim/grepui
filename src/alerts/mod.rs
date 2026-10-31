@@ -92,6 +92,23 @@ fn count() -> String {
     "count".into()
 }
 
+/// Metrics an LLM rule can watch (v0.16.0, ADR 0017).
+pub const LLM_METRICS: &[&str] = &["cost", "tokens", "calls", "error_rate", "latency_p95"];
+
+/// An alert condition over model calls in the org's trace v2 table: one metric over the
+/// lookback window, in total or per model, optionally for one model.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LlmMetric {
+    /// One of [`LLM_METRICS`]: `cost` (dollars), `tokens`, `calls`, `error_rate` (percent), `latency_p95` (ms).
+    pub metric: String,
+    #[serde(default)]
+    pub model: Option<String>,
+    /// One value per model instead of one in total.
+    #[serde(default)]
+    pub per_model: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Query {
@@ -101,6 +118,9 @@ pub struct Query {
     pub text: String,
     #[serde(default)]
     pub builder: Option<Builder>,
+    /// For `kind: "llm"`.
+    #[serde(default)]
+    pub llm: Option<LlmMetric>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -352,6 +372,11 @@ impl Rule {
                 };
                 query_check(q)?;
                 if self.kind == Kind::Anomaly {
+                    if q.kind == "llm" {
+                        return bad(
+                            "an anomaly rule cannot use an LLM metric yet; use a threshold",
+                        );
+                    }
                     if self.condition.is_some() {
                         return bad("an anomaly rule has no threshold; set the anomaly options");
                     }
@@ -440,7 +465,11 @@ impl Rule {
 fn query_check(q: &Query) -> Result<(), ApiError> {
     match q.kind.as_str() {
         "sql" => {
-            if q.text.trim().is_empty() || q.text.len() > MAX_QUERY || q.builder.is_some() {
+            if q.text.trim().is_empty()
+                || q.text.len() > MAX_QUERY
+                || q.builder.is_some()
+                || q.llm.is_some()
+            {
                 return bad("the SQL must be 1-8000 characters");
             }
             // Saved functions are for SQL mode and panels only; a rule runs its text as written.
@@ -462,13 +491,13 @@ fn query_check(q: &Query) -> Result<(), ApiError> {
             })
         }
         "promql" => {
-            if q.text.len() > MAX_QUERY || q.builder.is_some() {
+            if q.text.len() > MAX_QUERY || q.builder.is_some() || q.llm.is_some() {
                 return bad("the PromQL must be at most 8000 characters");
             }
             crate::query::metrics::check(&q.text)
         }
         "builder" => {
-            if !q.text.is_empty() {
+            if !q.text.is_empty() || q.llm.is_some() {
                 return bad("a builder query has no text");
             }
             let Some(b) = &q.builder else {
@@ -476,7 +505,28 @@ fn query_check(q: &Query) -> Result<(), ApiError> {
             };
             builder_check(b)
         }
-        _ => bad("query.kind must be sql, promql or builder"),
+        "llm" => {
+            if !q.text.is_empty() || q.builder.is_some() {
+                return bad("an llm query has no text and no builder");
+            }
+            let Some(l) = &q.llm else {
+                return bad("an llm query needs llm settings");
+            };
+            if !LLM_METRICS.contains(&l.metric.as_str()) {
+                return bad(format!(
+                    "llm.metric must be one of {}",
+                    LLM_METRICS.join(", ")
+                ));
+            }
+            if l.model
+                .as_deref()
+                .is_some_and(|m| !crate::llm::valid_model(m))
+            {
+                return bad("llm.model must be 1 to 128 characters without control characters");
+            }
+            Ok(())
+        }
+        _ => bad("query.kind must be sql, promql, builder or llm"),
     }
 }
 

@@ -2,7 +2,7 @@
 
 The single place to see where grepui stands: what is shipped, what is planned, what each release proves, and how a release is cut. Per-release detail (scope, acceptance criteria, named tests, checklist) lives in [`RELEASE/vX.Y.Z.md`](RELEASE/README.md); this file is the readable roll-up and the changelog.
 
-> **Current state:** v0.1.0 to v0.15.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.12.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
+> **Current state:** v0.1.0 to v0.16.0 are **ready** (code, tests and docs done; check `git log` for which are committed; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.12.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
 
 ## 1. Summary
 
@@ -21,12 +21,12 @@ grepui is a multi-tenant observability UI for GreptimeDB: one Rust binary (axum)
 
 ## 2. Release status
 
-Latest built: **v0.15.0: LLM traces, trace-level views** (ready). Newest first.
+Latest built: **v0.16.0: LLM traces, metric-level views** (ready). Newest first.
 
 | Release | Theme | Status | ACs | Requirements covered |
 |---|---|---|---|---|
 | [v1.0.0](RELEASE/v1.0.0.md) | Launch hardening | planned | 2 | R-C2 R-F4 R-Q1 |
-| [v0.16.0](RELEASE/v0.16.0.md) | LLM traces, metric-level views (analytics, sessions, alerts) | planned | 3 | R-AI5 R-AI6 R-AI10 |
+| [v0.16.0](RELEASE/v0.16.0.md) | LLM traces, metric-level views (analytics, sessions, alerts) | ready | 3 | R-AI5 R-AI6 R-AI10 |
 | [v0.15.0](RELEASE/v0.15.0.md) | LLM traces, trace-level views (span views, evaluations, agent graph, content protection) | ready | 5 | R-AI3 R-AI4 R-AI7 R-AI8 R-AI9 |
 | [v0.14.0](RELEASE/v0.14.0.md) | LLM traces, step L1 (trace layouts and Connect) | ready | 2 | R-AI1 R-AI2 |
 | [v0.13.0](RELEASE/v0.13.0.md) | Reports, RUM view and operate | ready | 5 | R-E1 R-O1 R-O2 R-O3 R-U1 |
@@ -63,6 +63,12 @@ Newest first. An entry is written when a release becomes `ready`; the same text 
 ### Unreleased
 
 - Requirements, architecture, positioning and parity matrix (ARCH 00–07), release plan with ACs for v0.1.0–v1.0.0, `scripts/seed.py` (demo traces and logs over OTLP/protobuf, `--db` per org).
+
+### v0.16.0: LLM traces, metric-level views (ready)
+
+Added: an LLM page (calls, tokens, cost, error rate and p50/p95/p99 latency over time and by model, provider, span kind and tool; sessions that open turn by turn; users), a model filter and the Traces page's filter bar on every view; cost is what spans reported plus the price table for calls that reported none, shown apart; alerts on LLM metrics (cost, tokens, calls, error rate, p95 latency, in total or per model, optionally for one model) through the existing engine, lease, dedup, history and preview, also creatable in the alert editor (ADR 0017). Routes `/llm/overview`, `/llm/breakdown`, `/llm/sessions`, `/llm/sessions/{id}`, `/llm/users`.
+
+No schema change, no new dependency, no new flag. Limits: see RELEASE/v0.16.0.md (raw spans, no rollup; trace v2 tables only; anomaly rules cannot use an LLM metric). The sidebar's "Coming" list is gone.
 
 ### v0.15.0: LLM traces, trace-level views (ready)
 
@@ -198,6 +204,7 @@ Honest ledger of what has actually been run. Updated as releases land.
 | OpenInference spans on trace v2 (JSON2) | spike on v1.3.0: stored with 19 fixed columns (300 indexed messages and a 200 KB prompt in one span), queried with `json_get_*(col, '["key"]')`; grepui's trace list/waterfall/logs work on a v2 table, its span panel and attribute filters do not yet (roadmap LLM track L1) |
 | CI-parity run (fresh `make db-down db-up`, seed, `make test-db`) | green for every live test after the v0.4.0 fixes; it reproduced the v0.3.0 CI failure and found the join bug below |
 | **GreptimeDB v1.2.1: `IN (subquery)`, `EXISTS` and self-joins on a telemetry table return wrong, nondeterministic rows** | verified live (4 / 6 / 5 / 0 for a true 33); no such query is used (ADR 0007); the v0.5.0 dependency self-join is verified correct on v1.3.0 (`ac_0_5_3_dependencies_live`) |
+| LLM analytics, sessions, users and alerts (v0.16.0) | verified live on GreptimeDB v1.3.0 (every breakdown, total, series, session, turn order, user and both alert rules against numbers computed from a generated OpenInference batch) and in a browser as admin. Not exercised: a real SDK's session ids, the page as a viewer |
 | LLM span views, prices, evaluations, feedback, agent graph, content protection (v0.15.0) | verified live on GreptimeDB v1.3.0 (agent graph of three traces from a generated OpenInference batch equals the graph computed from the spans, edges and call counts) and in 22 offline tests; browser pass as admin. Not exercised: viewer-masked content in a browser, `gen_ai.evaluation.result` from a real SDK |
 | Trace layouts and LLM Connect (v0.14.0): flat and JSON2 trace tables, attribute filters, span panel, Connect headers | verified live on GreptimeDB v1.3.0 (a generated OpenInference batch sent to a v2 table and filtered by model, span kind, a numeric attribute, a substring and the project, each against counts taken from the batch; the Connect headers accepted and a v1 header refused on the same table); the real OpenTelemetry SDK with the OpenInference OpenAI instrumentor sent to a v2 table by hand; in a browser. Not exercised: `arize-phoenix-otel`, a v1 and a v2 table in one organisation's workflow beyond the tests |
 | Reports, RUM, cache, metrics, shutdown, read-only check (v0.13.0): report render and mail, once per slot between two schedulers, failures recorded, six identical concurrent reads hit the database once, TTL and bounds, metrics counters move, in-flight request survives shutdown | verified live for RUM (exact counts of page views, sessions, visitors, INP ratings, error groups against known rows in a throwaway database); the rest offline with fakes; in a browser: RUM tabs on real data, Reports page, and a real 200 KB HTML email through a local SMTP sink (found and fixed the 998-character line limit). Not exercised: a real mail provider, two real processes sharing a store for the once-per-slot claim, SIGTERM on a container, `--read-only-user` against a genuinely read-only GreptimeDB account |
