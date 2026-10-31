@@ -6,6 +6,7 @@ pub mod filter;
 pub mod logs;
 pub mod reader;
 pub mod sqlmode;
+pub mod traces;
 
 use crate::error::{ApiError, ReadError};
 use async_trait::async_trait;

@@ -40,3 +40,19 @@ export function fmtDuration(secs) {
   if (secs < 86400) return `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`;
   return `${Math.floor(secs / 86400)}d`;
 }
+
+/** Microseconds as a short duration: 850 µs, 12.4 ms, 1.82 s. */
+export function fmtUs(us) {
+  if (us == null || Number.isNaN(Number(us))) return '–';
+  const v = Number(us);
+  if (v < 1000) return `${Math.round(v)} µs`;
+  if (v < 1e6) return `${(v / 1000).toFixed(v < 1e4 ? 2 : 1)} ms`;
+  return `${(v / 1e6).toFixed(2)} s`;
+}
+
+/** A stable colour per service name. */
+export function serviceColor(name) {
+  let hash = 0;
+  for (const c of String(name || '')) hash = (hash * 31 + c.charCodeAt(0)) >>> 0;
+  return `hsl(${hash % 360} 55% 52%)`;
+}

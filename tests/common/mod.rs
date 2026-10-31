@@ -108,6 +108,20 @@ pub fn sample_db(q: &Q) -> Result<Vec<Value>, ReadError> {
             json!({"table_name": "opentelemetry_logs", "engine": "mito", "table_rows": 2016, "data_length": 48051, "index_length": 386, "create_options": "greptime.semantic.signal_type=log append_mode=true"}),
         ],
         "stream_ddl" => vec![json!({"Table": "opentelemetry_logs", "Create Table": FULLTEXT_DDL})],
+        "traces_list" | "traces_scatter" => vec![
+            json!({"trace_id": TID, "start_ms": 1_793_399_384_857i64, "duration_us": 9_801, "spans": 5, "services": 4, "errors": 1, "root_service": "frontend", "root_operation": "GET /"}),
+            json!({"trace_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "start_ms": 1_793_399_300_000i64, "duration_us": 2_000, "spans": 1, "services": 1, "errors": 0, "root_service": "cart", "root_operation": "GET /cart"}),
+        ],
+        "traces_histogram" => vec![
+            json!({"bucket_ms": 1_793_399_100_000i64, "n": 12}),
+            json!({"bucket_ms": 1_793_399_160_000i64, "n": 30}),
+        ],
+        "traces_services" => vec![
+            json!({"service_name": "cart"}),
+            json!({"service_name": "frontend"}),
+        ],
+        "trace_spans" => sample_trace(),
+        "trace_logs" => vec![log_row("1793399384857990822", "ERROR", "Charge failed")],
         "stream_sample" => {
             vec![json!({"timestamp": 1_760_003_600_000i64, "service_name": "cart", "body": "ok"})]
         }
@@ -175,6 +189,97 @@ pub async fn send(app: &Router, method: Method, uri: &str) -> Resp {
 
 pub async fn get(app: &Router, uri: &str) -> Resp {
     send(app, Method::GET, uri).await
+}
+
+pub const TID: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+pub const T_NS: i64 = 1_793_399_000_000_000_000;
+
+/// One `trace_spans` row.
+#[allow(clippy::too_many_arguments)]
+pub fn span_row(
+    id: &str,
+    parent: Option<&str>,
+    service: &str,
+    name: &str,
+    start_off_ms: i64,
+    end_off_ms: i64,
+    status: &str,
+) -> Value {
+    let (s, e) = (
+        T_NS + start_off_ms * 1_000_000,
+        T_NS + end_off_ms * 1_000_000,
+    );
+    json!({
+        "timestamp": s / 1_000_000, "start_ns": s.to_string(), "end_ns": e.to_string(), "trace_id": TID, "span_id": id,
+        "parent_span_id": parent, "service_name": service, "span_name": name, "span_kind": "SPAN_KIND_SERVER",
+        "span_status_code": status, "span_status_message": "", "duration_nano": (e - s), "scope_name": "demo",
+        "span_attributes.http.route": name, "span_attributes.http.status_code": if status == "STATUS_CODE_ERROR" { 500 } else { 200 },
+        "resource_attributes.service.version": "1.4.2", "span_events": [], "span_links": [],
+    })
+}
+
+/// frontend 0-100ms
+///   cart 5-40 -> postgres 10-30
+///   checkout 45-95 -> Charge 50-70 (error), Charge 72-90, Reserve 91-94
+pub fn sample_trace() -> Vec<Value> {
+    let ok = "STATUS_CODE_OK";
+    vec![
+        span_row("a000000000000001", None, "frontend", "GET /", 0, 100, ok),
+        span_row(
+            "a000000000000002",
+            Some("a000000000000001"),
+            "cart",
+            "GET /cart",
+            5,
+            40,
+            ok,
+        ),
+        span_row(
+            "a000000000000003",
+            Some("a000000000000002"),
+            "postgres",
+            "SELECT carts",
+            10,
+            30,
+            ok,
+        ),
+        span_row(
+            "a000000000000004",
+            Some("a000000000000001"),
+            "checkout",
+            "PlaceOrder",
+            45,
+            95,
+            ok,
+        ),
+        span_row(
+            "a000000000000005",
+            Some("a000000000000004"),
+            "payment",
+            "Charge",
+            50,
+            70,
+            "STATUS_CODE_ERROR",
+        ),
+        span_row(
+            "a000000000000006",
+            Some("a000000000000004"),
+            "payment",
+            "Charge",
+            72,
+            90,
+            ok,
+        ),
+        span_row(
+            "a000000000000007",
+            Some("a000000000000004"),
+            "inventory",
+            "Reserve",
+            91,
+            94,
+            ok,
+        ),
+    ]
 }
 
 pub const NOW_MS: i64 = 1_760_003_600_000;

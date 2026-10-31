@@ -4,12 +4,12 @@ A multi-tenant observability UI for [GreptimeDB](https://greptime.com), in one R
 
 grepui reads what your collectors already send to GreptimeDB. It does not ingest telemetry itself. Every panel can show the SQL it ran ("Show SQL"), and every route is scoped to an org (a tenant mapped to a GreptimeDB database).
 
-**Status: v0.3.0 (state and data health).** Available now: saved views (shareable by link) and recent searches, Data health (is data arriving, how fast, which service went quiet), stream details (size, TTL, indexes), and Logs (filter bar, histogram, fields with types and top values, expandable records with Search Around, SQL mode, CSV/NDJSON export), Streams, Connect (how to send OTLP and Prometheus data, with copy-ready snippets), org switcher, time range, Show SQL, and a playground mode with demo data. Traces, services, metrics, dashboards, alerts and the enterprise tier are planned: see [RELEASE.md](RELEASE.md) for the plan and [ARCH/07_parity_matrix.md](ARCH/07_parity_matrix.md) for the feature comparison and gaps.
+**Status: v0.4.0 (traces).** Available now: Traces (search spans, traces over time, latency scatter, one row per trace, waterfall, flame graph, span panel with attributes and events, and the trace-to-logs pivot both ways), saved views (shareable by link) and recent searches, Data health (is data arriving, how fast, which service went quiet), stream details (size, TTL, indexes), and Logs (filter bar, histogram, fields with types and top values, expandable records with Search Around, SQL mode, CSV/NDJSON export), Streams, Connect (how to send OTLP and Prometheus data, with copy-ready snippets), org switcher, time range, Show SQL, and a playground mode with demo data. Traces, services, metrics, dashboards, alerts and the enterprise tier are planned: see [RELEASE.md](RELEASE.md) for the plan and [ARCH/07_parity_matrix.md](ARCH/07_parity_matrix.md) for the feature comparison and gaps.
 
 ## Try it
 
 ```sh
-make db-up                 # GreptimeDB v1.2.1 in docker (HTTP 4000, MySQL 4002)
+make db-up                 # GreptimeDB v1.3.0 in docker (HTTP 4000, MySQL 4002)
 make playground           # seeds a `demo` database with demo traces + logs, keeps live traffic going, serves http://127.0.0.1:8080
 ```
 
@@ -50,6 +50,9 @@ All data routes are `GET /api/v1/orgs/{org}/...` and return `{ "data": ..., "met
 | `/history` (GET, POST) | the last 100 searches (30 days); an identical repeat is not stored |
 | `/ingest/freshness`, `/ingest/rate`, `/ingest/services` | newest row per stream and quiet warning, rows per bucket, last span per service |
 | `/streams/{name}/info`, `/streams/{name}/ddl` | size and engine; indexes, partitions, TTL and keys from `SHOW CREATE TABLE` |
+| `/traces?from&to&q&service&errors&min_ms&limit&offset` | one row per trace; filters must match the same span |
+| `/traces/histogram`, `/traces/scatter`, `/traces/services` | traces over time, latency points (capped at 500), service names |
+| `/traces/{id}` (`?from&to`, default last 7 days), `/traces/{id}/flame`, `/traces/{id}/logs?span=` | spans as a waterfall with depth and offsets and the span panel data; merged flame graph; logs of the trace or one span |
 | `/connect` | endpoints, headers and snippets for sending telemetry |
 | `/logs?from&to&q&level&limit&offset` | search; `q` is the filter bar (`key=value`, `key!=value`, `key~substring`, `"quoted text"`) |
 | `/logs/histogram`, `/logs/fields`, `/logs/fields/{field}/values` | hits over time, columns with types, top values |

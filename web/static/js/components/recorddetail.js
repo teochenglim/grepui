@@ -26,7 +26,7 @@ export function recordDetail(r) {
     copy.textContent = (await copyText(raw)) ? 'Copied' : 'Select and copy';
     setTimeout(() => (copy.textContent = 'Copy JSON'), 1500);
   });
-  const trace = r.trace_id ? h('span', { class: 'kv' }, h('code', null, 'trace_id'), h('span', { class: 'mono', title: 'Trace view arrives in v0.4' }, r.trace_id)) : null;
+  const trace = r.trace_id ? h('span', { class: 'kv' }, h('code', null, 'trace_id'), h('a', { class: 'mono', href: href('traces', r.trace_id), title: 'Open this trace' }, r.trace_id)) : null;
   return h(
     'div',
     { class: 'record' },

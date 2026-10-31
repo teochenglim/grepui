@@ -41,7 +41,7 @@ export async function healthPage(view) {
 
   for (const stream of ['logs', 'traces']) {
     api.get('ingest/rate', { from: w.from, to: w.to, stream }).then(({ data }) =>
-      mount(boxes[stream], h('h2', null, `Rows per bucket: ${stream}`), data.total ? [histogram(data, w.from, w.to), h('p', { class: 'muted' }, `${fmtNum(data.total)} rows, about ${data.per_minute < 10 ? data.per_minute.toFixed(1) : fmtNum(Math.round(data.per_minute))} per minute`)] : h('div', { class: 'empty' }, 'No rows in this time range.')),
+      mount(boxes[stream], h('h2', null, `Rows per bucket: ${stream}`), data.total ? [histogram(data, w.from, w.to, 'rows'), h('p', { class: 'muted' }, `${fmtNum(data.total)} rows, about ${data.per_minute < 10 ? data.per_minute.toFixed(1) : fmtNum(Math.round(data.per_minute))} per minute`)] : h('div', { class: 'empty' }, 'No rows in this time range.')),
     ).catch((e) => mount(boxes[stream], h('h2', null, `Rows per bucket: ${stream}`), stateBox(e.message, 'error')));
   }
   api.get('ingest/services', { from: w.from, to: w.to }).then(({ data }) =>

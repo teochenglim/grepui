@@ -255,6 +255,7 @@ fn fill(route: &str) -> String {
         .replace("{name}", "t")
         .replace("{field}", "severity_text")
         .replace("{id}", "0123456789abcdef")
+        .replace("{trace_id}", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 }
 
 #[tokio::test]

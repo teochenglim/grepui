@@ -36,6 +36,9 @@ Docs: `ROADMAP.md` = plan · `RELEASE.md` = release log + summary, **newest firs
 - Changed behaviour means updating the `ARCH/` or `RELEASE/` doc it touches, unprompted, plus `RELEASE.md` status and `ARCH/07_parity_matrix.md`. A new implementation choice that changes the decision log means a new file in `docs/adr/`.
 - Test every GreptimeDB statement against the pinned version (`GREPTIME_VERSION` in Makefile), not just by reading docs. Statements not yet run live are listed in `RELEASE.md` section 5.
 
+- **GreptimeDB is pinned to v1.3.0** (`GREPTIME_VERSION` in the Makefile, the compose file, CI via `make db-up`); older versions are unsupported. Joins, `IN (subquery)` and `EXISTS` returned wrong, nondeterministic rows on v1.2.x and are correct on v1.3.0 (retested, ADR 0007); the trace filters keep conditional aggregation anyway. Any new join needs a live test against an independently computed answer. Compute each aggregate once: a repeated aggregate expression in one select list is still a planner error.
+- **Live tests must not depend on flush state or shared data.** A freshly seeded GreptimeDB has `data_length = 0` (CI failed v0.3.0 on this), and the shared `public` database accumulates duplicate seed runs. Build a throwaway database from the deterministic generator and assert exact numbers (see `tests/ac_traces.rs`). Before tagging, reproduce CI: `make db-down db-up`, `python3 scripts/seed.py`, `make test-db`.
+
 ## Supply chain
 
 - `.github/workflows/security.yml` (modelled on teochenglim/cogent): Semgrep SAST, Trivy filesystem and image scans, SARIF to the Security tab, weekly. Run the same scans locally with docker before a release.
@@ -45,7 +48,7 @@ Docs: `ROADMAP.md` = plan · `RELEASE.md` = release log + summary, **newest firs
 
 - Timestamps are `TIMESTAMP(9)` (ns): convert to ms/us in SQL before they reach JSON/JS.
 - Quote reserved words in GreptimeDB SQL.
-- Span attributes are flat columns named `span_attributes.<key>`; log and resource attributes are JSON (verified on v1.2.1).
+- Span attributes are flat columns named `span_attributes.<key>`; log and resource attributes are JSON (trace pipeline v1; verified on v1.2.1 and v1.3.0; the opt-in `greptime_trace_v2` stores attributes in JSON2 columns, see ARCH/08).
 - GreptimeDB's OTLP endpoint accepts protobuf only.
 - Flow sink tables get an extra `update_at` column; do not `SELECT *` from them.
 - Append-mode tables reject `DELETE`; erasure relies on TTL.

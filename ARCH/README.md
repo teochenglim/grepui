@@ -12,4 +12,5 @@ Architecture and the reasons behind it. Read in order.
 | [05_tech_stack_and_release.md](05_tech_stack_and_release.md) | Dependencies and why, versioning, CI and release pipeline |
 | [06_positioning.md](06_positioning.md) | Goal (parity plus enterprise tier), design choices D1–D9, differences, non-goals |
 | [07_parity_matrix.md](07_parity_matrix.md) | Feature-by-feature comparison with the reference platform, evidence-tagged |
+| [08_llm_observability.md](08_llm_observability.md) | LLM / OpenInference track: conventions, GreptimeDB storage options (verified), candidate requirements, risks |
 | [architecture.mmd](architecture.mmd) | Mermaid source of the diagram |

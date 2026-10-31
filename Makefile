@@ -3,7 +3,7 @@ BINARY := grepui
 
 # Single source of truth for the version (no external tooling required).
 VERSION_CURRENT := $(shell cat VERSION 2>/dev/null || echo 0.0.0)
-GREPTIME_VERSION ?= v1.2.1
+GREPTIME_VERSION ?= v1.3.0
 GREPTIME_NAME := grepui-db
 IMAGE ?= ghcr.io/teochenglim/grepui
 

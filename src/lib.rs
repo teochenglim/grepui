@@ -4,6 +4,7 @@
 pub mod api;
 pub mod config;
 pub mod error;
+pub mod layout;
 pub mod org;
 pub mod playground;
 pub mod probe;

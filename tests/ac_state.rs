@@ -182,6 +182,7 @@ fn fill(route: &str) -> String {
         .replace("{name}", "t")
         .replace("{field}", "severity_text")
         .replace("{id}", "0123456789abcdef")
+        .replace("{trace_id}", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 }
 
 #[tokio::test]
@@ -1209,8 +1210,12 @@ async fn ac_0_3_5_stream_details_live() {
     assert_eq!(info.status, StatusCode::OK, "{}", info.text());
     let d = &info.json()["data"];
     assert_eq!(d["engine"], "mito");
+    // Rows are known as soon as they are written. Sizes only count data flushed to storage, so on
+    // a freshly seeded database (CI) they are 0: assert they are sane numbers, not that they are
+    // positive. (This assertion once failed CI for v0.3.0.)
+    assert!(d["rows_estimate"].as_i64().unwrap() > 0, "{d}");
     assert!(
-        d["rows_estimate"].as_i64().unwrap() > 0 && d["data_bytes"].as_i64().unwrap() > 0,
+        d["data_bytes"].as_i64().unwrap() >= 0 && d["index_bytes"].as_i64().unwrap() >= 0,
         "{d}"
     );
     let ddl = get(&a, &format!("{BASE}/streams/opentelemetry_logs/ddl"))

@@ -3,7 +3,7 @@
 # going, and serves on :8080. For a real deployment use `serve` (the image default) instead.
 services:
   greptimedb:
-    image: greptime/greptimedb:v1.2.1
+    image: greptime/greptimedb:v1.3.0
     command: >
       standalone start --http-addr 0.0.0.0:4000 --rpc-bind-addr 0.0.0.0:4001
       --mysql-addr 0.0.0.0:4002 --postgres-addr 0.0.0.0:4003

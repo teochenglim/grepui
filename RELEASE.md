@@ -2,7 +2,7 @@
 
 The single place to see where grepui stands: what is shipped, what is planned, what each release proves, and how a release is cut. Per-release detail (scope, acceptance criteria, named tests, checklist) lives in [`RELEASE/vX.Y.Z.md`](RELEASE/README.md); this file is the readable roll-up and the changelog.
 
-> **Current state:** v0.1.0 to v0.3.0 are **ready** (code, tests and docs done; v0.1.0 and v0.2.0 are committed, v0.3.0 is not; tags and releases are the owner's step). No tag has been pushed, so nothing is published. v0.4.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
+> **Current state:** v0.1.0 to v0.4.0 are **ready** (code, tests and docs done; v0.1.0 to v0.3.0 are committed, v0.4.0 is not; tags and releases are the owner's step). v0.3.0's GitHub run failed in the `GreptimeDB integration` job (a test assumed flushed data); the fix ships in v0.4.0. v0.5.0 onward are planned and unstarted. Statuses below are updated when a release changes state, in the same change as the code.
 
 ## 1. Summary
 
@@ -11,7 +11,7 @@ grepui is a multi-tenant observability UI for GreptimeDB: one Rust binary (axum)
 | Fact | Value |
 |---|---|
 | Language / runtime | Rust (edition 2024), axum 0.8, sqlx (MySQL protocol to GreptimeDB), no Node anywhere |
-| Pinned GreptimeDB | `v1.2.1` (`GREPTIME_VERSION` in the Makefile) |
+| Pinned GreptimeDB | `v1.3.0` (`GREPTIME_VERSION` in the Makefile, the compose file, CI); v1.2.x is unsupported |
 | Tenancy | Multi-tenant from v0.1.0: org-scoped routes; orgs map to GreptimeDB databases |
 | Releases planned | 14 (v0.1.0 to v0.13.0, then v1.0.0) |
 | Requirements | 78 (`ARCH/00_requirements_traceability.md`) |
@@ -21,7 +21,7 @@ grepui is a multi-tenant observability UI for GreptimeDB: one Rust binary (axum)
 
 ## 2. Release status
 
-Latest built: **v0.3.0: State, saved views, stream health and the SQL-mode fix** (ready). Newest first.
+Latest built: **v0.4.0: Traces and the v0.3.0 CI fix** (ready). Newest first.
 
 | Release | Theme | Status | ACs | Requirements covered |
 |---|---|---|---|---|
@@ -35,7 +35,7 @@ Latest built: **v0.3.0: State, saved views, stream health and the SQL-mode fix**
 | [v0.7.0](RELEASE/v0.7.0.md) | Rollups and extended retention | planned | 4 | R-F4 R-P1 R-P2 R-P3 R-X1 |
 | [v0.6.0](RELEASE/v0.6.0.md) | Metrics | planned | 2 | R-M1 R-M2 |
 | [v0.5.0](RELEASE/v0.5.0.md) | Services and service map | planned | 4 | R-V1 R-V2 R-V3 R-V4 |
-| [v0.4.0](RELEASE/v0.4.0.md) | Traces | planned | 6 | R-R1 R-R2 R-R3 R-R4 R-R5 R-R6 |
+| [v0.4.0](RELEASE/v0.4.0.md) | Traces and the v0.3.0 CI fix | ready | 6 | R-R1 R-R2 R-R3 R-R4 R-R5 R-R6 |
 | [v0.3.0](RELEASE/v0.3.0.md) | State, saved views, stream health and the SQL-mode fix | ready | 7 | R-F4 R-I2 R-L5 R-Q1 R-S1 R-S2 R-S3 R-S4 R-S5 |
 | [v0.2.0](RELEASE/v0.2.0.md) | Logs and playground | ready | 9 | R-G1 R-L1 R-L2 R-L3 R-L4 R-L5 R-L6 R-L7 R-Q1 |
 | [v0.1.0](RELEASE/v0.1.0.md) | Foundation | ready | 13 | R-D1 R-D2 R-D3 R-F1 R-F2 R-F3 R-F4 R-F5 R-I1 R-Q1 R-Q2 R-Q3 R-Q4 R-T1 |
@@ -61,11 +61,17 @@ Newest first. An entry is written when a release becomes `ready`; the same text 
 
 - Requirements, architecture, positioning and parity matrix (ARCH 00–07), release plan with ACs for v0.1.0–v1.0.0, `scripts/seed.py` (demo traces and logs over OTLP/protobuf, `--db` per org).
 
+### v0.4.0: Traces and the v0.3.0 CI fix (ready)
+
+Added: Trace list (one row per trace), traces over time, latency scatter, service filter, minimum duration, errors only, attribute filters on the flat `span_attributes.*` columns; Trace page: waterfall (depth, offsets), flame graph (identical call paths merged), span panel (attributes, resource, events, links); Trace to logs and back: logs of a trace or one span, trace links from log records; Fix for the v0.3.0 CI failure (a live test that assumed flushed data); Pinned GreptimeDB moved from v1.2.1 to v1.3.0 (Makefile, compose, README).
+
+Live tests build their own throwaway database from the deterministic generator and assert exact numbers (spans, errors, durations, offsets, depths, log counts) instead of relying on shared data. **GreptimeDB v1.2.1 returns wrong, nondeterministic results for `IN (subquery)`, `EXISTS` and self-joins on the trace table** (found by the live test: 4, 6, 5, 0 for a true 33); the trace filters use conditional aggregation in one `GROUP BY` instead, and a trace matches when one span satisfies all filters (ADR 0007). The planner also rejects a repeated aggregate expression, so each aggregate is computed once in a derived table. Waterfall math uses nanosecond strings (JS cannot hold them) and microsecond output. Traces opened from the list carry `?at=<start_ms>` so the page searches a window around the trace; a bare link searches the last 7 days. Reproduced CI locally (`make db-down db-up`, seed, `make test-db`) and found the join bug that way. Not exercised in a browser: error-heavy traces and truncated (5000+ span) traces (covered by tests only).
+
 ### v0.3.0: State, saved views, stream health and the SQL-mode fix (ready)
 
 Added: `grepui migrate` and the `grepui_*` metadata database and tables (schema version, saved views, history), with one guarded writer (the write allowlist is now exactly those tables); Saved views (create, rename, delete, share by link) and recent-search history in the Logs toolbar; Stream details (size, TTL, indexes, partitions, keys) and a Data health page (freshness, rate, last seen per service, quiet-stream warning); Security fix carried from v0.2.0: SQL mode checks every SHOW/DESC variant against the org's database and refuses TQL; Playground also creates the state store; `make migrate`.
 
-First release that writes: only to the `grepui` metadata database, through `AppState::write`, which admits nothing but `INSERT INTO` the allowlisted tables (ADR 0006). Updates are upserts on (primary key, time index) and deletes are soft deletes: both verified live. Until access control (v0.11.0) the owner and history user are the implicit user `local`. Evaluated and not adopted: GreptimeDB's official Rust ingester crate (gRPC, ingestion-focused, about 106 extra crates); `sqlx` over the MySQL protocol is the recommended client for reads and for these small writes (ARCH 05). Found by live tests and fixed: `name` is a reserved word in GreptimeDB (quoted everywhere); `TIMESTAMP(3)` casts to milliseconds, not nanoseconds (an earlier divisor made history look 20 000 days old); the relation visitor misreads `SHOW TABLES FROM greptime.public`, so SHOW/DESC are checked by their own fields. Data size reads 0 B until GreptimeDB flushes a table to storage. Not yet exercised in a browser: the quiet-stream banner (covered by tests only).
+First release that writes: only to the `grepui` metadata database, through `AppState::write`, which admits nothing but `INSERT INTO` the allowlisted tables (ADR 0006). Updates are upserts on (primary key, time index) and deletes are soft deletes: both verified live. Until access control (v0.11.0) the owner and history user are the implicit user `local`. Evaluated and not adopted: GreptimeDB's official Rust ingester crate (gRPC, ingestion-focused, about 106 extra crates); `sqlx` over the MySQL protocol is the recommended client for reads and for these small writes (ARCH 05). Found by live tests and fixed: `name` is a reserved word in GreptimeDB (quoted everywhere); `TIMESTAMP(3)` casts to milliseconds, not nanoseconds (an earlier divisor made history look 20 000 days old); the relation visitor misreads `SHOW TABLES FROM greptime.public`, so SHOW/DESC are checked by their own fields. Data size reads 0 B until GreptimeDB flushes a table to storage. Not yet exercised in a browser: the quiet-stream banner (covered by tests only). **Known issue in v0.3.0 as tagged (fixed in v0.4.0, test-only):** the live test `ac_0_3_5_stream_details_live` asserted `data_bytes > 0`, which is false on a freshly seeded GreptimeDB (data is unflushed), so the GitHub `GreptimeDB integration` job failed on the tag; the product code was correct.
 
 ### v0.2.0: Logs and playground (ready)
 
@@ -137,11 +143,7 @@ To verify live: `TQL EVAL` output columns and label handling over the MySQL prot
 
 Will add: Services list with RED; Per-service series and operations; Dependencies and service map graph; Service catalog with annotations (metadata table).
 
-### v0.4.0: Traces (planned)
-
-Will add: Trace list with histogram and latency scatter; Trace detail: waterfall, flame graph, span panel; Trace ↔ logs pivot.
-
-Schema finding (live, v1.2.1): span attributes are flat columns named `span_attributes.<key>`; log and resource attributes are JSON.
+No joins (ADR 0007): dependency edges (caller to callee) must not use a self-join, which returns wrong rows on GreptimeDB v1.2.1; fetch spans with a plain scan and pair parents and children in Rust, or use conditional aggregation.
 
 ## 5. Verified and unverified
 
@@ -154,9 +156,14 @@ Honest ledger of what has actually been run. Updated as releases land.
 | `scripts/seed.py` writes traces and logs; `opentelemetry_traces`, `opentelemetry_logs` and the `_services` / `_operations` tables appear | verified live on v1.2.1 |
 | Column names, types and roles of the two OTLP tables (span attributes are flat `span_attributes.*` columns) | verified live on v1.2.1 |
 | Bound parameters over the MySQL protocol for `approx_percentile_cont`, `TQL EVAL`, process list, `ALTER TABLE ... SET ttl`, pipeline API, Flow DDL | **not yet run**: first exercised in the release that needs each |
-| v0.1.0 to v0.3.0 code | `make check` green (offline tests + `ac-map`); `make test-db` green on GreptimeDB v1.2.1 (live tests for streams, search, histogram, search around, fulltext, playground); `cargo deny` and `cargo audit` clean; UI checked in a real browser (screenshots in `images/`) |
+| v0.1.0 to v0.4.0 code | `make check` green (offline tests + `ac-map`); `make test-db` green on GreptimeDB v1.2.1 (live tests for streams, search, histogram, search around, fulltext, playground); `cargo deny` and `cargo audit` clean; UI checked in a real browser (screenshots in `images/`) |
 | Bound timestamp parameters, `TIMESTAMP(9)` and `JSON` decoding, `information_schema` | verified live (v0.1.0): sqlx needs `DateTime<Utc>` for `TIMESTAMP` and its `json` feature for `JSON` |
 | `matches_term` with a bound term, `json_get_string` with dotted keys (path form `["k.x"]`), bound `LIKE` with backslash escapes, `CAST(CAST(ts AS BIGINT) AS VARCHAR)` nanosecond keys, `UNION ALL` of ordered limited selects, `SHOW CREATE TABLE`, `DESC TABLE`, SQL-mode window macros | verified live (v0.2.0); details in ARCH/03 |
+| **Pin moved from GreptimeDB v1.2.1 to v1.3.0** (v0.4.0) | full live suite (15 tests) green on a fresh v1.3.0 through `make db-up`; grepui v0.1 to v0.4 run unchanged; the join bug is fixed upstream, the duplicate-aggregate planner limit remains (ADR 0007, ARCH/03) |
+| OpenInference spans on trace v2 (JSON2) | spike on v1.3.0: stored with 19 fixed columns (300 indexed messages and a 200 KB prompt in one span), queried with `json_get_*(col, '["key"]')`; grepui's trace list/waterfall/logs work on a v2 table, its span panel and attribute filters do not yet (roadmap LLM track L1) |
+| CI-parity run (fresh `make db-down db-up`, seed, `make test-db`) | green for every live test after the v0.4.0 fixes; it reproduced the v0.3.0 CI failure and found the join bug below |
+| **GreptimeDB v1.2.1: `IN (subquery)`, `EXISTS` and self-joins on a telemetry table return wrong, nondeterministic rows** | verified live (4 / 6 / 5 / 0 for a true 33); no such query is used (ADR 0007); v0.5.0 service dependencies must avoid self-joins |
+| Trace list, histogram, scatter, waterfall, flame graph, span panel, logs pivot (v0.4.0) | verified live against generated traces with exact numbers (`ac_0_4_*_live`) and in a browser (list, trace page, flame graph, logs tab, span panel) |
 | State store on GreptimeDB (v0.3.0): upsert by key + time index, soft delete, org isolation, `TIMESTAMP(3)` casts to ms, reserved word `name`, migration idempotent, views read back from a second app instance | verified live (`ac_0_3_*_live`) and in a browser (save, share link, recent, data health, stream details) |
 | Quiet-stream banner on the Data health page | logic covered by tests; the banner itself **not yet seen in a browser** (needs 5 minutes of silence) |
 | SQL-mode tenant-isolation fix (SHOW/DESC variants, TQL) | reproduced against a live server, fixed, regression tests, re-verified live; **v0.2.0 as committed still has the gap** (see its release notes) |

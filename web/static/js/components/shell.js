@@ -10,12 +10,13 @@ import { timeRange } from './timerange.js';
 // Pages that exist now, and the release that adds each of the others (RELEASE.md).
 const LIVE = [
   ['logs', 'Logs'],
+  ['traces', 'Traces'],
   ['streams', 'Streams'],
   ['health', 'Data health'],
   ['connect', 'Connect'],
 ];
 const SOON = [
-  ['Traces', 'v0.4'], ['Services', 'v0.5'], ['Metrics', 'v0.6'], ['Dashboards', 'v0.8'], ['Alerts', 'v0.9'],
+  ['Services', 'v0.5'], ['Metrics', 'v0.6'], ['Dashboards', 'v0.8'], ['Alerts', 'v0.9'],
 ];
 
 export function buildShell(root) {

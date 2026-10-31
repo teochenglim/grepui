@@ -25,7 +25,7 @@ pub const QUICK_FIELDS: &[&str] = &[
 /// Plain columns whose top values may be listed (low cardinality).
 pub const TOP_VALUE_COLUMNS: &[&str] = &["severity_text", "scope_name", "scope_version"];
 
-const COLS: &str = "`timestamp`, CAST(CAST(`timestamp` AS BIGINT) AS VARCHAR) AS ts_ns, `severity_text`, \
+pub const COLS: &str = "`timestamp`, CAST(CAST(`timestamp` AS BIGINT) AS VARCHAR) AS ts_ns, `severity_text`, \
 `severity_number`, `body`, `trace_id`, `span_id`, `scope_name`, `log_attributes`, `resource_attributes`";
 
 /// A column a condition or a top-values request can point at.

@@ -6,6 +6,7 @@ pub mod ingest;
 pub mod logs;
 pub mod sql;
 pub mod streams;
+pub mod traces;
 pub mod views;
 
 use crate::{
@@ -36,10 +37,15 @@ pub struct AppState {
     pub clock: Clock,
     /// Whether each org's logs table has a fulltext index on `body` (R-L6), cached briefly.
     pub ft_cache: std::sync::Mutex<std::collections::HashMap<String, (std::time::Instant, bool)>>,
+    /// Columns of each org's traces table (flat attribute columns included), cached briefly.
+    pub cols_cache: ColsCache,
 }
 
 pub type Shared = Arc<AppState>;
 pub type Clock = Arc<dyn Fn() -> i64 + Send + Sync>;
+/// Column names of a table by `org/table`, with when they were read.
+pub type ColsCache =
+    std::sync::Mutex<std::collections::HashMap<String, (std::time::Instant, Arc<Vec<String>>)>>;
 
 pub fn system_clock() -> Clock {
     Arc::new(|| {
@@ -88,6 +94,7 @@ impl AppState {
             writer,
             clock,
             ft_cache: Default::default(),
+            cols_cache: Default::default(),
         }))
     }
 
@@ -167,6 +174,13 @@ pub const ROUTES: &[&str] = &[
     "/api/v1/orgs/{org}/views",
     "/api/v1/orgs/{org}/views/{id}",
     "/api/v1/orgs/{org}/history",
+    "/api/v1/orgs/{org}/traces",
+    "/api/v1/orgs/{org}/traces/histogram",
+    "/api/v1/orgs/{org}/traces/scatter",
+    "/api/v1/orgs/{org}/traces/services",
+    "/api/v1/orgs/{org}/traces/{trace_id}",
+    "/api/v1/orgs/{org}/traces/{trace_id}/flame",
+    "/api/v1/orgs/{org}/traces/{trace_id}/logs",
     "/api/v1/orgs/{org}/logs",
     "/api/v1/orgs/{org}/logs/histogram",
     "/api/v1/orgs/{org}/logs/fields",
@@ -225,6 +239,22 @@ pub fn router(state: Shared) -> Router {
         .route(
             "/api/v1/orgs/{org}/history",
             get(views::history).post(views::record),
+        )
+        .route("/api/v1/orgs/{org}/traces", get(traces::list))
+        .route(
+            "/api/v1/orgs/{org}/traces/histogram",
+            get(traces::histogram),
+        )
+        .route("/api/v1/orgs/{org}/traces/scatter", get(traces::scatter))
+        .route("/api/v1/orgs/{org}/traces/services", get(traces::services))
+        .route("/api/v1/orgs/{org}/traces/{trace_id}", get(traces::detail))
+        .route(
+            "/api/v1/orgs/{org}/traces/{trace_id}/flame",
+            get(traces::flame),
+        )
+        .route(
+            "/api/v1/orgs/{org}/traces/{trace_id}/logs",
+            get(traces::logs),
         )
         .route("/api/v1/orgs/{org}/logs", get(logs::search))
         .route("/api/v1/orgs/{org}/logs/histogram", get(logs::histogram))

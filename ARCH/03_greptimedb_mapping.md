@@ -59,3 +59,23 @@ Each is one function in the query builders, so a dialect fix is a small edit. `_
 | `information_schema.tables` | `data_length`, `index_length`, `table_rows`, `engine`, `create_options`; sizes are 0 until a table is flushed to storage |
 | `WITH (ttl = '30d')` | stored and echoed by `SHOW CREATE TABLE` as `ttl = '30days'` |
 | Backtick-quoted column list `PARTITION ON COLUMNS`, `FULLTEXT INDEX`, `SKIPPING INDEX`, `INVERTED INDEX` | parsed from `SHOW CREATE TABLE` (the fulltext line verified live; the others from the documented syntax) |
+| `IN (SELECT ...)`, `EXISTS`, self-`JOIN` on a telemetry table | **wrong and nondeterministic results** on v1.2.1 (4 / 6 / 5 / 0 for a true 33); never used (ADR 0007) |
+| Conditional aggregation `sum(CASE WHEN pred THEN 1 ELSE 0 END)` inside one `GROUP BY`, filtered in a derived table | correct and deterministic; the basis of the trace filters |
+| Same aggregate expression twice in one select list | planner error "duplicate unqualified field name"; compute once in a derived table with aliases |
+| OTLP span columns | `timestamp`/`timestamp_end` are `TIMESTAMP(9)`, `parent_span_id` is NULL for roots (not an empty string), status `STATUS_CODE_OK`/`STATUS_CODE_ERROR`, kind `SPAN_KIND_SERVER`/`SPAN_KIND_CLIENT`, attributes are flat `span_attributes.<key>` and `resource_attributes.<key>` columns, `span_events`/`span_links` are JSON |
+| `SELECT *, CAST(CAST(timestamp AS BIGINT) AS VARCHAR) AS start_ns` | works: exact nanoseconds as strings alongside every flat attribute column |
+
+## Re-verified on GreptimeDB v1.3.0 (the pinned version since v0.4.0)
+
+| Item | Result on v1.3.0 |
+|---|---|
+| grepui v0.1 to v0.4 against a fresh v1.3.0 (streams, logs, traces and filters, ingest health, migrate, playground, all 15 live tests) | works unchanged |
+| `IN (subquery)`, `EXISTS`, self-`JOIN` | **correct and stable** (32 of 32 on repeats); fixed since v1.2.1, not mentioned in the release notes read (ADR 0007) |
+| Same aggregate twice in a select list | still a planner error |
+| `greptime_trace_v2` pipeline (`x-greptime-pipeline-name`, separate table, `x-greptime-trace-table-name`) | accepted; **19 fixed columns**: `span_attributes`, `scope_attributes`, `resource_attributes` as JSON2, `span_events`/`span_links` as JSON, `service_name` tag, `timestamp` TIMESTAMP(9). v1.2.1 rejected it ("Unsupported pipeline for trace") |
+| JSON2 attribute access | `json_get_string(span_attributes, '["llm.model_name"]')`, `json_get_int`, `json_get_float`; the bare dotted key returns NULL (same path rule as v1 JSON); `span_attributes['k']` and `span_attributes.k` do not work for dotted keys; `CAST(span_attributes AS STRING)` is unsupported |
+| JSON2 column through grepui's MySQL reader | decodes to a JSON object (SQL mode and the API) |
+| OpenInference-shaped spans (181 spans, 308 KB OTLP request) | stored; includes a span with 300 indexed messages and a 200 KB prompt: no new columns, point read of message 299 in about 30 ms |
+| Aggregations over JSON2 | tokens and cost by model, span-kind mix, sessions, p95 latency, project name from `resource_attributes` all work |
+| Existing v1 tables | not migrated automatically ("Existing Trace V1 tables are not automatically migrated"); a v2 write to a v1 table is rejected |
+| grepui trace detail and attribute filters on a v2 table | **do not work yet**: the span panel returns empty attributes (it reads flat columns) and `q=tool.name=...` is rejected as an unknown column. Roadmap: LLM track, step L1 |

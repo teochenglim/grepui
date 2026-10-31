@@ -6,6 +6,8 @@ import { connectPage } from './pages/connect.js';
 import { healthPage } from './pages/health.js';
 import { logsPage } from './pages/logs.js';
 import { notFound } from './pages/notfound.js';
+import { traceDetailPage } from './pages/trace-detail.js';
+import { tracesPage } from './pages/traces.js';
 import { streamDetailPage } from './pages/stream-detail.js';
 import { streamsPage } from './pages/streams.js';
 import { route, start } from './router.js';
@@ -13,6 +15,8 @@ import { route, start } from './router.js';
 const shell = buildShell(document.getElementById('app'));
 
 route('logs', logsPage);
+route('traces', tracesPage);
+route('traces/:id', traceDetailPage);
 route('streams', streamsPage);
 route('streams/:name', streamDetailPage);
 route('connect', connectPage);

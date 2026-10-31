@@ -7,7 +7,7 @@ The roll-up and changelog live in [`../RELEASE.md`](../RELEASE.md). One file per
 | [v0.1.0](v0.1.0.md) | Foundation | D2 D4 D6 D7 D8 | `make check` green; Streams and Connect pages work against the pinned GreptimeDB; three workflows pinned | - |
 | [v0.2.0](v0.2.0.md) | Logs and playground | D1 D4 D6 | filter bar → bound SQL; SQL mode refuses non-read statements; live tests on seeded OTLP logs; the playground seeds a demo database once | 0.1 |
 | [v0.3.0](v0.3.0.md) | State, saved views, stream health and the SQL-mode fix | D2 D3 D6 | `grepui migrate` idempotent on the pinned DB; saved views and history live in GreptimeDB and are read back through a second app instance; data-health page works; SQL mode confines every statement variant to the org's database | 0.2 |
-| [v0.4.0](v0.4.0.md) | Traces | D1 | one row per trace; waterfall, flame graph and span panel data correct on seeded traces; log pivot works both ways | 0.3 |
+| [v0.4.0](v0.4.0.md) | Traces and the v0.3.0 CI fix | D1 | one row per trace; waterfall, flame graph and span panel data exactly match generated traces on a fresh database; log pivot works both ways; the CI-parity run (fresh unflushed database) is green | 0.3 |
 | [v0.5.0](v0.5.0.md) | Services and service map | D1 | RED matches numbers computed from the seed; service map and catalog render from API data | 0.4 |
 | [v0.6.0](v0.6.0.md) | Metrics | D4 | PromQL via TQL works on seeded metrics; shareable metric URLs round-trip | 0.5 |
 | [v0.7.0](v0.7.0.md) | Rollups and extended retention | D5 | 7-day window answered from the Flow sink; TTL changes are previewed, applied and audited-ready | 0.6 |
