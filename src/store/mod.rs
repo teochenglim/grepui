@@ -13,7 +13,7 @@ use crate::{
 use anyhow::{Result, bail};
 
 /// Bumped when a migration changes the schema; the binary refuses to run against a newer one.
-pub const SCHEMA_VERSION: i64 = 1;
+pub const SCHEMA_VERSION: i64 = 2;
 /// The one row in `grepui_schema` (`component = 'core'`) holding the version.
 pub const COMPONENT: &str = "core";
 /// How long history entries are kept (also the table TTL).
@@ -39,11 +39,16 @@ pub fn migration_statements(meta_db: &str) -> Result<Vec<String>> {
         format!(
             "CREATE TABLE IF NOT EXISTS `{db}`.`grepui_history` (`org_id` STRING, `username` STRING, `kind` STRING, `spec` STRING, `ts` TIMESTAMP(3) NOT NULL, TIME INDEX (`ts`), PRIMARY KEY (`org_id`, `username`, `kind`)) WITH (ttl = '{HISTORY_DAYS}d')"
         ),
+        // Service catalog notes (v0.5.0): one row per (org, service), upserted at a constant `ts`;
+        // `updated_by` and `updated_ms` are what the audit log (v0.11.0) will build on.
+        format!(
+            "CREATE TABLE IF NOT EXISTS `{db}`.`grepui_services` (`org_id` STRING, `service` STRING, `description` STRING, `owner` STRING, `tier` STRING, `runbook` STRING, `updated_by` STRING, `updated_ms` BIGINT, `deleted` BOOLEAN, `ts` TIMESTAMP(3) NOT NULL, TIME INDEX (`ts`), PRIMARY KEY (`org_id`, `service`))"
+        ),
     ])
 }
 
 /// Tables that hold tenant data and therefore must carry `org_id` (R-S5).
-pub const TENANT_TABLES: &[&str] = &["grepui_views", "grepui_history"];
+pub const TENANT_TABLES: &[&str] = &["grepui_views", "grepui_history", "grepui_services"];
 
 /// Allow only statements the store itself builds: `INSERT INTO <meta_db>.<allowlisted table> ...`.
 pub fn check_write(q: &Q, meta_db: &str) -> Result<()> {

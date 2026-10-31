@@ -119,3 +119,16 @@ button.icon { padding: 1px 6px; border: 0; font-size: 13px; }
 .flame { position: relative; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); margin-top: 6px; overflow: hidden; }
 .flame-node { position: absolute; height: 22px; box-sizing: border-box; border: 1px solid var(--surface); border-radius: 3px; color: #fff; font-size: 11.5px; line-height: 20px; padding: 0 5px; overflow: hidden; white-space: nowrap; cursor: pointer; text-shadow: 0 1px 1px rgba(0,0,0,.35); } .flame-node:hover, .flame-node:focus { filter: brightness(1.15); outline: 2px solid var(--text); z-index: 2; }
 @media (max-width: 900px) { .side-col { width: 100%; position: static; max-height: none; } .wf-head, .wf-row { grid-template-columns: minmax(120px, 40%) 1fr; } }
+
+/* Services */
+.line { width: 100%; height: 130px; display: block; }
+.line .axis { stroke: var(--line); vector-effect: non-scaling-stroke; } .line .grid { stroke: var(--line); stroke-dasharray: 3 4; vector-effect: non-scaling-stroke; } .line .tick { fill: var(--muted); font-size: 11px; }
+.line .path { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; } .line .dot { fill: var(--accent); } .line.bad .path { stroke: var(--bad); } .line.bad .dot { fill: var(--bad); }
+.smap-wrap { overflow: auto; } .smap { display: block; width: 100%; height: auto; }
+.smap .node { cursor: pointer; } .smap .node-box { fill: var(--surface-2); stroke-width: 2; } .smap .node:hover .node-box, .smap .node:focus .node-box { fill: color-mix(in srgb, var(--accent) 14%, var(--surface-2)); outline: none; }
+.smap .node-name { fill: var(--text); font-size: 13px; font-weight: 600; } .smap .node-sub { fill: var(--muted); font-size: 11px; }
+.smap .edge-path { fill: none; stroke: var(--muted); opacity: .7; } .smap .edge.bad .edge-path { stroke: var(--bad); opacity: .9; } .smap .edge-label { fill: var(--muted); font-size: 11px; }
+.smap .arrowhead.ok { fill: var(--muted); } .smap .arrowhead.bad { fill: var(--bad); }
+.noteform { display: flex; flex-direction: column; gap: 8px; } .noteform label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); font-size: 12px; } .noteform textarea { font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+.note p { margin: 0 0 6px; } .badge.tier-critical { color: var(--bad); } .badge.tier-high { color: var(--warn); }
+.stack { display: flex; flex-direction: column; gap: var(--gap); }

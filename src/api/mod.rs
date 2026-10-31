@@ -4,6 +4,7 @@ pub mod connect;
 pub mod health;
 pub mod ingest;
 pub mod logs;
+pub mod services;
 pub mod sql;
 pub mod streams;
 pub mod traces;
@@ -181,6 +182,11 @@ pub const ROUTES: &[&str] = &[
     "/api/v1/orgs/{org}/traces/{trace_id}",
     "/api/v1/orgs/{org}/traces/{trace_id}/flame",
     "/api/v1/orgs/{org}/traces/{trace_id}/logs",
+    "/api/v1/orgs/{org}/services",
+    "/api/v1/orgs/{org}/services/{service}",
+    "/api/v1/orgs/{org}/services/{service}/annotation",
+    "/api/v1/orgs/{org}/dependencies",
+    "/api/v1/orgs/{org}/catalog",
     "/api/v1/orgs/{org}/logs",
     "/api/v1/orgs/{org}/logs/histogram",
     "/api/v1/orgs/{org}/logs/fields",
@@ -198,6 +204,8 @@ pub const WRITE_ROUTES: &[(&str, &str)] = &[
     ("PUT", "/api/v1/orgs/{org}/views/{id}"),
     ("DELETE", "/api/v1/orgs/{org}/views/{id}"),
     ("POST", "/api/v1/orgs/{org}/history"),
+    ("PUT", "/api/v1/orgs/{org}/services/{service}/annotation"),
+    ("DELETE", "/api/v1/orgs/{org}/services/{service}/annotation"),
 ];
 
 /// Largest request body any route accepts.
@@ -240,6 +248,20 @@ pub fn router(state: Shared) -> Router {
             "/api/v1/orgs/{org}/history",
             get(views::history).post(views::record),
         )
+        .route("/api/v1/orgs/{org}/services", get(services::list))
+        .route(
+            "/api/v1/orgs/{org}/services/{service}",
+            get(services::detail),
+        )
+        .route(
+            "/api/v1/orgs/{org}/services/{service}/annotation",
+            axum::routing::put(services::annotate).delete(services::clear_annotation),
+        )
+        .route(
+            "/api/v1/orgs/{org}/dependencies",
+            get(services::dependencies),
+        )
+        .route("/api/v1/orgs/{org}/catalog", get(services::catalog))
         .route("/api/v1/orgs/{org}/traces", get(traces::list))
         .route(
             "/api/v1/orgs/{org}/traces/histogram",

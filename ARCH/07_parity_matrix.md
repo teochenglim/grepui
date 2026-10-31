@@ -25,7 +25,7 @@ Status: `planned` (requirement ID and release; a row whose release is `ready` or
 | Query history | unconfirmed | | planned R-S3, 0.3 | |
 | Explain and Analyze query | nav | | planned via R-L5 (`EXPLAIN`) | |
 | Refresh cache / run query | nav | | planned R-O1, 0.13 | Cache bypass parameter |
-| Cross-linking between signals | nav | | planned R-R6, 0.4 | D1 |
+| Cross-linking between signals | nav | | built R-R6, 0.4 | D1 |
 | VRL functions on logs | read | | differs R-N2, 0.10 | Saved SQL functions, no VRL |
 | Insights (root-cause analysis over anomaly periods) | nav | | gap | Revisit after 1.0 |
 | Log patterns | nav | | gap | Revisit after 1.0 |
@@ -47,14 +47,14 @@ Status: `planned` (requirement ID and release; a row whose release is `ready` or
 | Feature | Evidence | Edition | grepui | Notes |
 |---|---|---|---|---|
 | OTLP, Jaeger, Zipkin ingestion | read | | n/a, GreptimeDB | Connect page; Jaeger read API possible later |
-| Search by service, operation, duration, errors, attributes | read | | planned R-R1, 0.4 | |
-| Hierarchical trace view, waterfall/Gantt | read | | planned R-R3, 0.4 | |
-| Span attributes and tags | read | | planned R-R5, 0.4 | |
-| Service map with performance and error rates | read | | planned R-V3, 0.5 | |
-| Flame graph | unconfirmed | | planned R-R4, 0.4 | Beyond what the docs show |
-| RED metrics | unconfirmed | | planned R-V1, R-V2, 0.5 | |
-| Trace-to-logs correlation | unconfirmed | | planned R-R6, 0.4 | D1 |
-| Service catalog | unconfirmed | | planned R-V4, 0.5 | |
+| Search by service, operation, duration, errors, attributes | read | | built R-R1, 0.4 | |
+| Hierarchical trace view, waterfall/Gantt | read | | built R-R3, 0.4 | |
+| Span attributes and tags | read | | built R-R5, 0.4 | |
+| Service map with performance and error rates | read | | built R-V3, 0.5 | |
+| Flame graph | unconfirmed | | built R-R4, 0.4 | Beyond what the docs show |
+| RED metrics | unconfirmed | | built R-V1, R-V2, 0.5 | |
+| Trace-to-logs correlation | unconfirmed | | built R-R6, 0.4 | D1 |
+| Service catalog | unconfirmed | | built R-V4, 0.5 | |
 
 ## Dashboards
 

@@ -153,3 +153,64 @@ pub fn history_list(
         binds,
     ))
 }
+
+/// A service catalog note as stored (R-V4).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ServiceNote {
+    pub service: String,
+    pub description: String,
+    pub owner: String,
+    pub tier: String,
+    pub runbook: String,
+    pub updated_by: String,
+    pub updated_ms: i64,
+    pub deleted: bool,
+}
+
+const NOTE_COLS: &str =
+    "`service`, `description`, `owner`, `tier`, `runbook`, `updated_by`, `updated_ms`";
+
+pub fn service_notes(meta_db: &str, org_name: &str) -> Result<Q> {
+    let t = qualified(meta_db, "grepui_services")?;
+    Ok(Q::new(
+        "service_notes",
+        format!(
+            "SELECT {NOTE_COLS} FROM {t} WHERE `org_id` = ? AND `deleted` = false ORDER BY `service` LIMIT 1000"
+        ),
+        vec![org(org_name)?],
+    ))
+}
+
+pub fn service_note_get(meta_db: &str, org_name: &str, service: &str) -> Result<Q> {
+    let t = qualified(meta_db, "grepui_services")?;
+    Ok(Q::new(
+        "service_note_get",
+        format!(
+            "SELECT {NOTE_COLS} FROM {t} WHERE `org_id` = ? AND `service` = ? AND `deleted` = false LIMIT 1"
+        ),
+        vec![org(org_name)?, Bind::Str(service.to_string())],
+    ))
+}
+
+/// Insert or overwrite a note (same `org_id`, `service` and constant `ts`).
+pub fn service_note_put(meta_db: &str, org_name: &str, n: &ServiceNote) -> Result<Q> {
+    let t = qualified(meta_db, "grepui_services")?;
+    Ok(Q::new(
+        "service_note_put",
+        format!(
+            "INSERT INTO {t} (`org_id`, `service`, `description`, `owner`, `tier`, `runbook`, `updated_by`, `updated_ms`, `deleted`, `ts`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
+        vec![
+            org(org_name)?,
+            Bind::Str(n.service.clone()),
+            Bind::Str(n.description.clone()),
+            Bind::Str(n.owner.clone()),
+            Bind::Str(n.tier.clone()),
+            Bind::Str(n.runbook.clone()),
+            Bind::Str(n.updated_by.clone()),
+            Bind::Int(n.updated_ms),
+            Bind::Bool(n.deleted),
+            Bind::Str(ts_string(0)),
+        ],
+    ))
+}

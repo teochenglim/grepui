@@ -120,6 +120,23 @@ pub fn sample_db(q: &Q) -> Result<Vec<Value>, ReadError> {
             json!({"service_name": "cart"}),
             json!({"service_name": "frontend"}),
         ],
+        "services_red" => vec![
+            json!({"service_name": "frontend", "first_seen_ms": 1_793_399_000_000i64, "last_seen_ms": 1_793_399_900_000i64, "spans": 30, "requests": 30, "errors": 3, "avg_us": 26_000.5, "p95_us": 57_000.0}),
+            json!({"service_name": "postgres", "first_seen_ms": 1_793_399_000_000i64, "last_seen_ms": 1_793_399_900_000i64, "spans": 20, "requests": 0, "errors": 0, "avg_us": null, "p95_us": null}),
+        ],
+        "service_series" => vec![
+            json!({"bucket_ms": 1_793_399_100_000i64, "requests": 10, "errors": 1, "avg_us": 20_000.0, "p95_us": 50_000.0}),
+            json!({"bucket_ms": 1_793_399_400_000i64, "requests": 20, "errors": 2, "avg_us": 30_000.0, "p95_us": 60_000.0}),
+        ],
+        "service_operations" => vec![
+            json!({"operation": "GET /", "requests": 20, "errors": 2, "avg_us": 20_000.0, "p95_us": 50_000.0}),
+            json!({"operation": "POST /checkout", "requests": 10, "errors": 1, "avg_us": 40_000.0, "p95_us": 80_000.0}),
+        ],
+        "service_dependencies" => vec![
+            json!({"caller": "frontend", "callee": "cart", "calls": 233, "errors": 0, "avg_us": 23_000.0}),
+            json!({"caller": "frontend", "callee": "checkout", "calls": 240, "errors": 0, "avg_us": 26_000.0}),
+            json!({"caller": "checkout", "callee": "payment", "calls": 197, "errors": 32, "avg_us": 18_000.0}),
+        ],
         "trace_spans" => sample_trace(),
         "trace_logs" => vec![log_row("1793399384857990822", "ERROR", "Charge failed")],
         "stream_sample" => {
@@ -292,6 +309,7 @@ pub const NOW_MS: i64 = 1_760_003_600_000;
 pub struct MemStore {
     pub views: Mutex<HashMap<(String, String), Vec<Bind>>>,
     pub history: Mutex<Vec<Vec<Bind>>>,
+    pub notes: Mutex<HashMap<(String, String), Vec<Bind>>>,
     pub version: Mutex<Option<i64>>,
     pub ddl: Mutex<Vec<String>>,
     pub writes: Mutex<Vec<Q>>,
@@ -365,6 +383,22 @@ impl Reader for MemStore {
                 rows.sort_by_key(|(u, _)| std::cmp::Reverse(*u));
                 rows.into_iter().map(|(_, v)| v).collect()
             }
+            "service_notes" | "service_note_get" => {
+                let org = s_of(&q.binds[0]);
+                let only = q.binds.get(1).map(s_of);
+                let mut rows: Vec<(String, Value)> = self
+                    .notes
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|((o, sv), b)| {
+                        *o == org && b[8] == Bind::Bool(false) && only.as_ref().is_none_or(|x| x == sv)
+                    })
+                    .map(|((_, sv), b)| (sv.clone(), json!({"service": sv, "description": s_of(&b[2]), "owner": s_of(&b[3]), "tier": s_of(&b[4]), "runbook": s_of(&b[5]), "updated_by": s_of(&b[6]), "updated_ms": i_of(&b[7])})))
+                    .collect();
+                rows.sort_by(|a, b| a.0.cmp(&b.0));
+                rows.into_iter().map(|(_, v)| v).collect()
+            }
             "history_list" => {
                 let (org, user) = (s_of(&q.binds[0]), s_of(&q.binds[1]));
                 let has_kind = q.binds.len() == 4;
@@ -392,6 +426,12 @@ impl Writer for MemStore {
         match q.name {
             "view_put" => {
                 self.views
+                    .lock()
+                    .unwrap()
+                    .insert((s_of(&q.binds[0]), s_of(&q.binds[1])), q.binds.clone());
+            }
+            "service_note_put" => {
+                self.notes
                     .lock()
                     .unwrap()
                     .insert((s_of(&q.binds[0]), s_of(&q.binds[1])), q.binds.clone());

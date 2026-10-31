@@ -8,7 +8,7 @@ Saved views, history and (later) dashboards, alerts and users need storage. ADR 
 
 ## Decision
 
-- **A dedicated database** (`--meta-database`, default `grepui`) holds `grepui_schema`, `grepui_views` and `grepui_history`. Telemetry databases stay free of grepui tables, and the metadata database can be backed up, granted or dropped on its own. `grepui migrate` creates it (the playground does this itself); `serve` only checks it.
+- **A dedicated database** (`--meta-database`, default `grepui`) holds `grepui_schema`, `grepui_views`, `grepui_history` and (from v0.5.0, schema version 2) `grepui_services`. Telemetry databases stay free of grepui tables, and the metadata database can be backed up, granted or dropped on its own. `grepui migrate` creates it (the playground does this itself); `serve` only checks it.
 - **Every tenant row carries `org_id`**, leading the primary key (R-S5). The version table is the one exemption: it holds no tenant data.
 - **Updates are upserts.** A row is identified by its primary key and time index. Views use a constant `ts` (creation time), so re-inserting the same key overwrites it: last write wins (verified live on v1.2.1). **Deletes are soft deletes** (`deleted = true`), which behaves the same on every table mode and keeps the write path to a single statement shape, `INSERT`.
 - **History** is append-only with a 30-day TTL on the table; reads also filter to the retention window, and an identical repeat of the newest entry is not stored.

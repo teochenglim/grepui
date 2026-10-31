@@ -238,3 +238,118 @@ pub fn flame(spans: &[SpanIn]) -> Value {
         .sum();
     json!({"name": "(trace)", "service": "", "count": 1, "total_us": total, "self_us": (total - child_total).max(0), "errors": 0, "children": merged})
 }
+
+/// A caller to callee edge with its call and error counts (R-V3).
+#[derive(Debug, Clone)]
+pub struct EdgeIn {
+    pub from: String,
+    pub to: String,
+    pub calls: i64,
+    pub errors: i64,
+    pub avg_us: f64,
+}
+
+pub const GRAPH_COL_W: i64 = 260;
+pub const GRAPH_ROW_H: i64 = 90;
+const GRAPH_PAD: i64 = 50;
+
+/// Layered layout for the service map: a node's column is the longest call path leading to it, so
+/// callers sit left of callees. Edges that close a cycle are kept, flagged `back`, and ignored
+/// when layering, so a cyclic call graph still lays out. Self loops are dropped unless asked for.
+/// Positions are plain numbers in a fixed grid: the page only draws.
+pub fn graph(edges: &[EdgeIn], self_loops: bool) -> Value {
+    let edges: Vec<&EdgeIn> = edges
+        .iter()
+        .filter(|e| self_loops || e.from != e.to)
+        .collect();
+    let mut names: Vec<&str> = edges
+        .iter()
+        .flat_map(|e| [e.from.as_str(), e.to.as_str()])
+        .collect();
+    names.sort_unstable();
+    names.dedup();
+    let idx: HashMap<&str, usize> = names.iter().enumerate().map(|(i, n)| (*n, i)).collect();
+    let n = names.len();
+    let mut out: Vec<Vec<(usize, usize)>> = vec![vec![]; n]; // (target, edge index)
+    for (ei, e) in edges.iter().enumerate() {
+        if e.from != e.to {
+            out[idx[e.from.as_str()]].push((idx[e.to.as_str()], ei));
+        }
+    }
+    // Depth-first search in name order; an edge into a node still on the stack closes a cycle.
+    let mut back = vec![false; edges.len()];
+    let mut state = vec![0u8; n]; // 0 new, 1 on stack, 2 done
+    let mut post = Vec::with_capacity(n);
+    for root in 0..n {
+        if state[root] != 0 {
+            continue;
+        }
+        state[root] = 1;
+        let mut stack = vec![(root, 0usize)];
+        while let Some((u, next)) = stack.pop() {
+            if let Some(&(v, ei)) = out[u].get(next) {
+                stack.push((u, next + 1));
+                match state[v] {
+                    0 => {
+                        state[v] = 1;
+                        stack.push((v, 0));
+                    }
+                    1 => back[ei] = true,
+                    _ => {}
+                }
+            } else {
+                state[u] = 2;
+                post.push(u);
+            }
+        }
+    }
+    let mut layer = vec![0i64; n];
+    for &u in post.iter().rev() {
+        for &(v, ei) in &out[u] {
+            if !back[ei] {
+                layer[v] = layer[v].max(layer[u] + 1);
+            }
+        }
+    }
+    let mut row_in_layer: HashMap<i64, i64> = HashMap::new();
+    let mut max_layer = 0;
+    let mut max_row = 0;
+    let mut calls_in = vec![0i64; n];
+    let mut calls_out = vec![0i64; n];
+    let mut errors_in = vec![0i64; n];
+    for e in &edges {
+        calls_out[idx[e.from.as_str()]] += e.calls;
+        calls_in[idx[e.to.as_str()]] += e.calls;
+        errors_in[idx[e.to.as_str()]] += e.errors;
+    }
+    let nodes: Vec<Value> = (0..n)
+        .map(|i| {
+            let row = row_in_layer.entry(layer[i]).or_insert(0);
+            let r = *row;
+            *row += 1;
+            max_layer = max_layer.max(layer[i]);
+            max_row = max_row.max(r);
+            json!({
+                "id": names[i], "layer": layer[i], "row": r,
+                "x": GRAPH_PAD + layer[i] * GRAPH_COL_W, "y": GRAPH_PAD + r * GRAPH_ROW_H,
+                "calls_in": calls_in[i], "calls_out": calls_out[i], "errors_in": errors_in[i],
+            })
+        })
+        .collect();
+    let edge_json: Vec<Value> = edges
+        .iter()
+        .enumerate()
+        .map(|(ei, e)| {
+            json!({
+                "from": e.from, "to": e.to, "calls": e.calls, "errors": e.errors, "avg_us": e.avg_us,
+                "error_pct": if e.calls > 0 { 100.0 * e.errors as f64 / e.calls as f64 } else { 0.0 },
+                "back": back[ei], "self": e.from == e.to,
+            })
+        })
+        .collect();
+    json!({
+        "nodes": nodes, "edges": edge_json,
+        "width": GRAPH_PAD * 2 + max_layer * GRAPH_COL_W + 180,
+        "height": GRAPH_PAD * 2 + max_row * GRAPH_ROW_H + 40,
+    })
+}

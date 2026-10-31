@@ -38,3 +38,7 @@ grepui is now pinned to v1.3.0 (released 2026-10-28). The same queries on a fres
 The v1.3.0 release notes that were read do not mention this fix (no semi-join or `IN`-subquery entry was found in the six most recent releases), so it is established by this test, not by a changelog. The wrong results are therefore a v1.2.x bug and grepui supports only v1.3.0 and newer.
 
 Consequences: the trace filters keep conditional aggregation because it is correct on both versions, needs one scan and keeps whole-trace aggregates exact, so there is no reason to rewrite it. New features may use joins and `IN (subquery)` where they are clearly simpler (the service dependency edges in the roadmap), provided a live test compares the result to an independently computed answer. The duplicate-aggregate rule still applies. If the pinned version moves again, rerun the table above first.
+
+## Update: first use of a join (v0.5.0)
+
+Service dependencies (`query/services.rs`) join each span to its parent span in one self-join and aggregate per caller and callee. It is the only join in grepui. `ac_0_5_3_dependencies_live` compares every edge with the answer computed from the generator's records and repeats the query to catch nondeterminism; the demo database gave the same edge counts as an independent pairing. The trace builders are unchanged and still avoid joins.

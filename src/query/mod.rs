@@ -5,6 +5,7 @@ pub mod build;
 pub mod filter;
 pub mod logs;
 pub mod reader;
+pub mod services;
 pub mod sqlmode;
 pub mod traces;
 
@@ -24,7 +25,12 @@ pub const MAX_LIMIT: u32 = 1000;
 
 /// Every table grepui may write to or run DDL against: its own metadata tables, in the
 /// metadata database (v0.3.0). A test pins the contents (R-F4, ADR 0004).
-pub const WRITE_TARGETS: &[&str] = &["grepui_schema", "grepui_views", "grepui_history"];
+pub const WRITE_TARGETS: &[&str] = &[
+    "grepui_schema",
+    "grepui_views",
+    "grepui_history",
+    "grepui_services",
+];
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Bind {

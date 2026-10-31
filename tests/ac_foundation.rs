@@ -254,6 +254,7 @@ fn fill(route: &str) -> String {
         .replace("{org}", "default")
         .replace("{name}", "t")
         .replace("{field}", "severity_text")
+        .replace("{service}", "cart")
         .replace("{id}", "0123456789abcdef")
         .replace("{trace_id}", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 }
@@ -286,7 +287,10 @@ async fn ac_0_1_4_every_listed_route_exists() {
             StatusCode::NOT_FOUND,
             "{route} is listed but not routed"
         );
-        assert_ne!(r.status, StatusCode::METHOD_NOT_ALLOWED, "{route}");
+        // Write-only routes (PUT/DELETE) answer GET with 405 by design.
+        if !route.ends_with("/annotation") {
+            assert_ne!(r.status, StatusCode::METHOD_NOT_ALLOWED, "{route}");
+        }
     }
 }
 
@@ -328,7 +332,12 @@ fn ac_0_1_4_write_allowlist_is_pinned() {
     // v0.1.0/0.2.0 had no write targets; from v0.3.0 they are exactly the metadata tables (ADR 0004).
     assert_eq!(
         WRITE_TARGETS,
-        ["grepui_schema", "grepui_views", "grepui_history"]
+        [
+            "grepui_schema",
+            "grepui_views",
+            "grepui_history",
+            "grepui_services"
+        ]
     );
 }
 

@@ -158,5 +158,9 @@ pub fn all_for_tests() -> Vec<Q> {
         ingest_services("public", "t", w).expect("valid idents"),
         stream_info("public", "t"),
         show_create("public", "t").expect("valid idents"),
+        super::services::services("public", "t", Some("cart"), w).expect("valid idents"),
+        super::services::series("public", "t", "cart", w).expect("valid idents"),
+        super::services::operations("public", "t", "cart", w).expect("valid idents"),
+        super::services::dependencies("public", "t", false, w).expect("valid idents"),
     ]
 }
